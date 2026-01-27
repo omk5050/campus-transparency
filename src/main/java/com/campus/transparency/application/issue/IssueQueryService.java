@@ -1,4 +1,4 @@
-package com.application.issue;
+package com.campus.transparency.application.issue;
 
 import com.campus.transparency.domain.issue.Issue;
 import com.campus.transparency.domain.issue.IssueRepository;
