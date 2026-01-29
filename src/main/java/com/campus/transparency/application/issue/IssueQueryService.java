@@ -16,17 +16,11 @@ public class IssueQueryService {
         this.issueRepository = issueRepository;
     }
 
-    /**
-     * Public feed – hidden issues excluded.
-     */
     @Transactional(readOnly = true)
     public List<Issue> getPublicIssues() {
         return issueRepository.findByHiddenFalse();
     }
 
-    /**
-     * Admin / Authority feed – includes hidden issues.
-     */
     @Transactional(readOnly = true)
     public List<Issue> getAllIssuesForAdmin() {
         return issueRepository.findAllIncludingHidden();
