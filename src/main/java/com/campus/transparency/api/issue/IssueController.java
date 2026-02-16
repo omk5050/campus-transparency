@@ -2,13 +2,13 @@ package com.campus.transparency.api.issue;
 
 import com.campus.transparency.application.issue.IssueCommandService;
 import com.campus.transparency.application.issue.IssueQueryService;
-import com.campus.transparency.domain.issue.Issue;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/issues")
@@ -32,11 +32,14 @@ public class IssueController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Issue create(@Valid @RequestBody CreateIssueRequest request) {
-        return commandService.create(
-                request.title(),
-                request.description(),
-                request.reporterHash()
+    public IssueResponse create(@Valid @RequestBody CreateIssueRequest request) {
+
+        return IssueResponse.from(
+                commandService.create(
+                        request.title(),
+                        request.description(),
+                        request.reporterHash()
+                )
         );
     }
 
@@ -63,12 +66,18 @@ public class IssueController {
        ========================= */
 
     @GetMapping
-    public List<Issue> publicFeed() {
-        return queryService.getPublicIssues();
+    public List<IssueResponse> publicFeed() {
+        return queryService.getPublicIssues()
+                .stream()
+                .map(IssueResponse::from)
+                .collect(Collectors.toList());
     }
 
     @GetMapping("/admin")
-    public List<Issue> adminFeed() {
-        return queryService.getAllIssuesForAdmin();
+    public List<IssueResponse> adminFeed() {
+        return queryService.getAllIssuesForAdmin()
+                .stream()
+                .map(IssueResponse::from)
+                .collect(Collectors.toList());
     }
 }
