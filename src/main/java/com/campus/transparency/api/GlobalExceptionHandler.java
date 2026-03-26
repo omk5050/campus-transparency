@@ -2,10 +2,8 @@ package com.campus.transparency.api;
 
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -13,35 +11,31 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public Map<String, String> handleValidation(MethodArgumentNotValidException ex) {
-        Map<String, String> errors = new HashMap<>();
+    // ✅ Handles ALL unexpected errors
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<?> handleException(Exception ex) {
 
-        ex.getBindingResult()
-          .getFieldErrors()
-          .forEach(error ->
-              errors.put(error.getField(), error.getDefaultMessage())
-          );
+        ex.printStackTrace(); // IMPORTANT for debugging
 
-        return errors;
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                Map.of(
+                        "error", ex.getMessage(),
+                        "type", ex.getClass().getSimpleName()
+                )
+        );
     }
 
+    // ✅ Handles validation errors ONLY
     @ExceptionHandler(ConstraintViolationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Map<String, String> handleConstraintViolation(ConstraintViolationException ex) {
-        Map<String, String> errors = new HashMap<>();
-        ex.getConstraintViolations()
-          .forEach(v -> errors.put(
-                  v.getPropertyPath().toString(),
-                  v.getMessage()
-          ));
-        return errors;
-    }
 
-    @ExceptionHandler(Exception.class)
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public Map<String, String> handleOther(Exception ex) {
-        return Map.of("error", "Internal server error");
+        Map<String, String> errors = new HashMap<>();
+
+        ex.getConstraintViolations().forEach(v ->
+                errors.put(v.getPropertyPath().toString(), v.getMessage())
+        );
+
+        return errors;
     }
 }

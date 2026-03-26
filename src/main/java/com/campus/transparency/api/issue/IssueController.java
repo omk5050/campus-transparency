@@ -4,6 +4,7 @@ import com.campus.transparency.application.issue.IssueCommandService;
 import com.campus.transparency.application.issue.IssueQueryService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,15 +21,16 @@ public class IssueController {
 
     public IssueController(
             IssueCommandService commandService,
-            IssueQueryService queryService
-    ) {
+            IssueQueryService queryService) {
         this.commandService = commandService;
         this.queryService = queryService;
     }
 
-    /* =========================
-       COMMANDS
-       ========================= */
+    /*
+     * =========================
+     * COMMANDS
+     * =========================
+     */
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -38,9 +40,7 @@ public class IssueController {
                 commandService.create(
                         request.title(),
                         request.description(),
-                        request.reporterHash()
-                )
-        );
+                        request.reporterHash()));
     }
 
     @PostMapping("/{id}/start")
@@ -61,9 +61,17 @@ public class IssueController {
         commandService.reject(id);
     }
 
-    /* =========================
-       QUERIES
-       ========================= */
+    @PostMapping("/{id}/review")
+    public ResponseEntity<Void> review(@PathVariable Long id) {
+        commandService.review(id);
+        return ResponseEntity.ok().build();
+    }
+
+    /*
+     * =========================
+     * QUERIES
+     * =========================
+     */
 
     @GetMapping
     public List<IssueResponse> publicFeed() {

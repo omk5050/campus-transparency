@@ -13,10 +13,28 @@ public class AuditLog extends BaseEntity {
     @Column(nullable = false, length = 100)
     private String actor;
 
+    @Column(nullable = false)
+    private Long issueId;
+
     protected AuditLog() {}
 
-    public AuditLog(String action, String actor) {
+    public AuditLog(String action, String actor, Long issueId) {
         this.action = action;
         this.actor = actor;
+        this.issueId = issueId;
+    }
+
+    // Getters (IMPORTANT for Hibernate / future use)
+
+    public String getAction() {
+        return action;
+    }
+
+    public String getActor() {
+        return actor;
+    }
+
+    public Long getIssueId() {
+        return issueId;
     }
 }
