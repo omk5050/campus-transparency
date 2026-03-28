@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: campus-transparency
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/campus_transparency
+    username: campus_app
+    password: "@Om1kadam1"
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate   # ⬅ RELYING ON FLYWAY
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+
+  sql:
+    init:
+      mode: never
+
+server:
+  port: 8080
