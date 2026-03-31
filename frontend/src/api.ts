@@ -1,5 +1,7 @@
 import { Signal, SignalStatus, AuditLog } from './app/types';
 
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+
 // Utility to get auth token
 export const getToken = () => localStorage.getItem('token');
 export const setToken = (token: string) => localStorage.setItem('token', token);
@@ -55,7 +57,7 @@ function mapIssueToSignal(issue: any): Signal {
 export const api = {
   // Auth
   async login(username: string, password: string):Promise<string> {
-    const res = await fetch('/api/auth/login', {
+    const res = await fetch(`${BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
@@ -68,7 +70,7 @@ export const api = {
 
   // Issues
   async getPublicFeed(status?: string, horizon?: string): Promise<Signal[]> {
-    let url = '/api/issues?size=50&sort=createdAt,desc';
+    let url = `${BASE_URL}/issues?size=50&sort=createdAt,desc`;
     if (status && status !== 'ALL') url += `&status=${status}`;
     
     if (horizon && horizon !== 'ALL') {
@@ -92,13 +94,13 @@ export const api = {
   },
 
   async getAdminFeed(): Promise<Signal[]> {
-    const res = await fetchWithAuth('/api/issues/admin?size=100&sort=createdAt,desc');
+    const res = await fetchWithAuth(`${BASE_URL}/issues/admin?size=100&sort=createdAt,desc`);
     const data = await res.json();
     return data.content.map(mapIssueToSignal);
   },
 
   async createIssue(title: string, description: string): Promise<Signal> {
-    const res = await fetchWithAuth('/api/issues', {
+    const res = await fetchWithAuth(`${BASE_URL}/issues`, {
       method: 'POST',
       body: JSON.stringify({ title, description, reporterHash: 'anon_' + Math.floor(Math.random()*1000) })
     });
@@ -108,28 +110,28 @@ export const api = {
 
   // Voting
   async upvote(id: string): Promise<void> {
-    await fetchWithAuth(`/api/issues/${id}/upvote`, { method: 'POST' });
+    await fetchWithAuth(`${BASE_URL}/issues/${id}/upvote`, { method: 'POST' });
   },
 
   async downvote(id: string): Promise<void> {
-    await fetchWithAuth(`/api/issues/${id}/downvote`, { method: 'POST' });
+    await fetchWithAuth(`${BASE_URL}/issues/${id}/downvote`, { method: 'POST' });
   },
 
   // Admin Actions
   async updateStatus(id: string, status: SignalStatus): Promise<void> {
     // Determine which endpoint to call based on status
-    if (status === 'REPORTED') await fetchWithAuth(`/api/issues/${id}/report`, { method: 'POST' });
-    else if (status === 'IN_PROGRESS') await fetchWithAuth(`/api/issues/${id}/start`, { method: 'POST' });
-    else if (status === 'RESOLVED') await fetchWithAuth(`/api/issues/${id}/resolve`, { method: 'POST' });
-    else if (status === 'REJECTED') await fetchWithAuth(`/api/issues/${id}/reject`, { method: 'POST' });
+    if (status === 'REPORTED') await fetchWithAuth(`${BASE_URL}/issues/${id}/report`, { method: 'POST' });
+    else if (status === 'IN_PROGRESS') await fetchWithAuth(`${BASE_URL}/issues/${id}/start`, { method: 'POST' });
+    else if (status === 'RESOLVED') await fetchWithAuth(`${BASE_URL}/issues/${id}/resolve`, { method: 'POST' });
+    else if (status === 'REJECTED') await fetchWithAuth(`${BASE_URL}/issues/${id}/reject`, { method: 'POST' });
   },
 
   async hideIssue(id: string): Promise<void> {
-    await fetchWithAuth(`/api/issues/${id}/hide`, { method: 'POST' });
+    await fetchWithAuth(`${BASE_URL}/issues/${id}/hide`, { method: 'POST' });
   },
 
   async getAuditLogs(): Promise<AuditLog[]> {
-    const res = await fetchWithAuth('/api/admin/audit?size=100&sort=createdAt,desc');
+    const res = await fetchWithAuth(`${BASE_URL}/admin/audit?size=100&sort=createdAt,desc`);
     const data = await res.json();
     return data.content;
   }
