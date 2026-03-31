@@ -52,6 +52,9 @@ public class SecurityConfig {
 
                         // Allow public access to authentication endpoints
                         .requestMatchers("/api/auth/**").permitAll()
+                        
+                        // Allow public access to view the issues feed without being logged in
+                        .requestMatchers(HttpMethod.GET, "/api/issues/**").permitAll()
 
                         // Require authentication for all other backend API requests
                         .anyRequest().authenticated())
