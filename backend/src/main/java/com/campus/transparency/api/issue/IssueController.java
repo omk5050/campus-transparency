@@ -2,6 +2,8 @@ package com.campus.transparency.api.issue;
 
 import com.campus.transparency.application.issue.IssueCommandService;
 import com.campus.transparency.application.issue.IssueQueryService;
+import com.campus.transparency.application.issue.AnonymousTagService;
+import com.campus.transparency.domain.issue.Issue;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -19,13 +21,16 @@ public class IssueController {
 
     private final IssueCommandService commandService;
     private final IssueQueryService queryService;
+    private final AnonymousTagService tagService;
 
     public IssueController(
             IssueCommandService commandService,
-            IssueQueryService queryService
+            IssueQueryService queryService,
+            AnonymousTagService tagService
     ) {
         this.commandService = commandService;
         this.queryService = queryService;
+        this.tagService = tagService;
     }
 
     /* =========================
@@ -37,13 +42,13 @@ public class IssueController {
     @PreAuthorize("hasRole('STUDENT')")
     public IssueResponse create(@Valid @RequestBody CreateIssueRequest request) {
         log.info("Student {} creating new issue titled '{}'", request.reporterHash(), request.title());
-        return IssueResponse.from(
-                commandService.create(
-                        request.title(),
-                        request.description(),
-                        request.reporterHash()
-                )
+        Issue issue = commandService.create(
+                request.title(),
+                request.description(),
+                request.reporterHash()
         );
+        String alias = tagService.generateAlias(issue.getReporterHash(), issue.getId());
+        return IssueResponse.from(issue, alias);
     }
 
     @PostMapping("/{id}/report")
@@ -116,7 +121,7 @@ public class IssueController {
             @RequestParam(defaultValue = "10") int size
     ) {
         return queryService.getPublicIssues(status, startDate, endDate, PageRequest.of(page, size))
-                .map(IssueResponse::from);
+                .map(issue -> IssueResponse.from(issue, tagService.generateAlias(issue.getReporterHash(), issue.getId())));
     }
 
     @GetMapping("/admin")
@@ -129,7 +134,7 @@ public class IssueController {
             @RequestParam(defaultValue = "10") int size
     ) {
         return queryService.getAllIssuesForAdmin(status, startDate, endDate, PageRequest.of(page, size))
-                .map(IssueResponse::from);
+                .map(issue -> IssueResponse.from(issue, tagService.generateAlias(issue.getReporterHash(), issue.getId())));
     }
 }
 

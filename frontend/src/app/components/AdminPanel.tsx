@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Signal, SignalStatus } from '../types';
+import { Signal, SignalStatus, AuditLog } from '../types';
 import { clsx } from 'clsx';
 import { AlertTriangle, Eye, EyeOff, X, Lock, TerminalSquare } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
@@ -20,12 +20,24 @@ export function AdminPanel({ onClose, refreshFeed }: AdminPanelProps) {
   
   const [signals, setSignals] = useState<Signal[]>([]);
   const [filter, setFilter] = useState<SignalStatus | 'ALL'>('ALL');
+  const [activeTab, setActiveTab] = useState<'ISSUES' | 'AUDIT'>('ISSUES');
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
   useEffect(() => {
     if (isLogged) {
-       loadAdminFeed();
+       if (activeTab === 'ISSUES') loadAdminFeed();
+       if (activeTab === 'AUDIT') loadAuditLogs();
     }
-  }, [isLogged]);
+  }, [isLogged, activeTab]);
+
+  const loadAuditLogs = async () => {
+     try {
+         const data = await api.getAuditLogs();
+         setAuditLogs(data);
+     } catch (e) {
+         toast.error("Failed to fetch audit records.");
+     }
+  };
 
   const loadAdminFeed = async () => {
      try {
@@ -145,8 +157,16 @@ export function AdminPanel({ onClose, refreshFeed }: AdminPanelProps) {
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
         <div className="w-64 bg-[#11151A] border-r border-white/5 p-6 flex flex-col space-y-6 hidden md:flex">
-           <div className="text-xs font-mono uppercase text-white/30 mb-2 tracking-widest">Filters</div>
-           {(['ALL', 'REPORTED', 'IN_PROGRESS', 'RESOLVED', 'REJECTED'] as const).map((status) => (
+           <div>
+             <div className="text-xs font-mono uppercase text-white/30 mb-2 tracking-widest">Views</div>
+             <button onClick={() => setActiveTab('ISSUES')} className={clsx("text-left px-3 py-2 text-xs font-mono uppercase tracking-wider block w-full border-l-2 transition-colors", activeTab === 'ISSUES' ? "border-[#00E5FF] text-[#00E5FF] bg-[#00E5FF]/5" : "border-transparent text-white/50")}>Signal DB</button>
+             <button onClick={() => setActiveTab('AUDIT')} className={clsx("text-left px-3 py-2 text-xs font-mono uppercase tracking-wider block w-full border-l-2 transition-colors", activeTab === 'AUDIT' ? "border-[#00E5FF] text-[#00E5FF] bg-[#00E5FF]/5" : "border-transparent text-white/50")}>Audit Logs</button>
+           </div>
+           
+           {activeTab === 'ISSUES' && (
+           <div>
+             <div className="text-xs font-mono uppercase text-white/30 mb-2 tracking-widest mt-4">Filters</div>
+             {(['ALL', 'REPORTED', 'IN_PROGRESS', 'RESOLVED', 'REJECTED'] as const).map((status) => (
              <button
                key={status}
                onClick={() => setFilter(status)}
@@ -160,10 +180,13 @@ export function AdminPanel({ onClose, refreshFeed }: AdminPanelProps) {
                {status}
              </button>
            ))}
+           </div>
+           )}
         </div>
 
         {/* Table */}
         <div className="flex-1 overflow-auto bg-[#0B0F14] p-6">
+          {activeTab === 'ISSUES' ? (
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-white/10 text-xs font-mono uppercase text-white/30 tracking-widest">
@@ -205,6 +228,30 @@ export function AdminPanel({ onClose, refreshFeed }: AdminPanelProps) {
               ))}
             </tbody>
           </table>
+          ) : (
+             <table className="w-full text-left border-collapse">
+               <thead>
+                 <tr className="border-b border-white/10 text-xs font-mono uppercase text-white/30 tracking-widest">
+                   <th className="p-4 font-normal">Audit ID</th>
+                   <th className="p-4 font-normal">Issue ID</th>
+                   <th className="p-4 font-normal">Action</th>
+                   <th className="p-4 font-normal">Actor</th>
+                   <th className="p-4 font-normal">Timestamp</th>
+                 </tr>
+               </thead>
+               <tbody>
+                 {auditLogs.map((log) => (
+                   <tr key={log.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                     <td className="p-4 font-mono text-xs text-white/40">{log.id}</td>
+                     <td className="p-4 font-mono text-xs text-white/40">{log.issueId}</td>
+                     <td className="p-4 text-sm max-w-xs">{log.action}</td>
+                     <td className="p-4 font-mono text-xs text-[#00E5FF]/80">{log.actor}</td>
+                     <td className="p-4 font-mono text-xs text-white/50">{new Date(log.createdAt).toLocaleString()}</td>
+                   </tr>
+                 ))}
+               </tbody>
+             </table>
+          )}
         </div>
       </div>
     </div>

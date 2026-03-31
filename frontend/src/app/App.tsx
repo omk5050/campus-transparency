@@ -11,12 +11,14 @@ import { SubmitSignal } from './components/SubmitSignal';
 import { SignalDetail } from './components/SignalDetail';
 import { AdminPanel } from './components/AdminPanel';
 import { format } from 'date-fns';
-
+import { GlobalErrorProvider } from './components/GlobalErrorProvider';
+import { FilterBar, FilterOptions } from './components/FilterBar';
 export default function App() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [sortBy, setSortBy] = useState<SortOption>('TRENDING');
   const [view, setView] = useState<'FEED' | 'SUBMIT' | 'ADMIN' | 'DETAIL'>('FEED');
   const [selectedSignalId, setSelectedSignalId] = useState<string | null>(null);
+  const [filters, setFilters] = useState<FilterOptions>({ status: 'ALL', horizon: 'ALL' });
 
   // Sorting Logic
   const sortedSignals = useMemo(() => {
@@ -31,14 +33,6 @@ export default function App() {
         break;
       case 'NEW':
         sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        break;
-      case 'UNRESOLVED':
-        // Prioritize unresolved, then by votes
-        sorted.sort((a, b) => {
-          if (a.status === 'RESOLVED' && b.status !== 'RESOLVED') return 1;
-          if (a.status !== 'RESOLVED' && b.status === 'RESOLVED') return -1;
-          return b.voteCount - a.voteCount;
-        });
         break;
     }
     return sorted;
@@ -84,14 +78,19 @@ export default function App() {
     }
   };
 
-  const loadFeed = async () => {
+  const loadFeed = async (currentFilters: FilterOptions = filters) => {
     try {
-       const feed = await api.getPublicFeed();
+       const feed = await api.getPublicFeed(currentFilters.status, currentFilters.horizon);
        setSignals(feed);
     } catch (e) {
        toast.error("Failed to sync main data link");
     }
   };
+
+  // Re-fetch when filters change natively
+  useEffect(() => {
+    loadFeed(filters);
+  }, [filters]);
 
   // Initial Bootup
   useEffect(() => {
@@ -137,8 +136,9 @@ export default function App() {
   }, [view]);
 
   return (
-    <div className="min-h-screen bg-[#0B0F14] text-[#E0E0E0] font-sans selection:bg-[#00E5FF] selection:text-[#0B0F14]">
-      <Toaster position="top-center" toastOptions={{
+    <GlobalErrorProvider>
+      <div className="min-h-screen bg-[#0B0F14] text-[#E0E0E0] font-sans selection:bg-[#00E5FF] selection:text-[#0B0F14]">
+        <Toaster position="top-center" toastOptions={{
         style: { background: '#1A1F26', border: '1px solid rgba(255,255,255,0.1)', color: '#E0E0E0', fontFamily: 'JetBrains Mono, monospace' }
       }}/>
 
@@ -156,6 +156,7 @@ export default function App() {
       {/* Main Feed */}
       <main className="max-w-5xl mx-auto px-4 md:px-6 py-8 pb-32">
         <div className="flex flex-col">
+           <FilterBar filters={filters} onChange={setFilters} />
            {/* Date Header */}
            <div className="mb-6 font-mono text-xs text-white/30 uppercase tracking-widest pl-2 border-l border-[#00E5FF]">
              {format(new Date(), "EEEE, MMMM do, yyyy")} // Active Term
@@ -206,6 +207,7 @@ export default function App() {
             </div>
         )}
       </AnimatePresence>
-    </div>
+      </div>
+    </GlobalErrorProvider>
   );
 }

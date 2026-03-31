@@ -12,4 +12,12 @@ export interface Signal {
   reporterHash: string;
 }
 
-export type SortOption = 'TRENDING' | 'TOP' | 'NEW' | 'UNRESOLVED';
+export type SortOption = 'TRENDING' | 'TOP' | 'NEW';
+
+export interface AuditLog {
+  id: number;
+  issueId: number;
+  action: string;
+  actor: string;
+  createdAt: string;
+}

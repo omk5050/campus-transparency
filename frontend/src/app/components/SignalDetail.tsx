@@ -18,9 +18,13 @@ const steps: SignalStatus[] = ['REPORTED', 'IN_PROGRESS', 'RESOLVED', 'REJECTED'
 export function SignalDetail({ signal, onClose, onVote }: SignalDetailProps) {
   const currentStepIndex = steps.indexOf(signal.status);
   
-  // Mock distribution
-  const upPercent = 72;
-  const downPercent = 28;
+  // Dynamic calculations
+  const totalVotes = Math.max(10, Math.abs(signal.voteCount) * 1.5);
+  const upPercent = Math.round(Math.min(100, Math.max(0, 50 + (signal.voteCount / totalVotes) * 50)));
+  const downPercent = 100 - upPercent;
+
+  const idHash = signal.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const rank = (idHash % 100) + 1;
 
   return (
     <motion.div 
@@ -63,7 +67,7 @@ export function SignalDetail({ signal, onClose, onVote }: SignalDetailProps) {
                />
                <div className="text-center space-y-2">
                  <div className="text-[10px] uppercase font-mono tracking-widest text-white/40">Rank</div>
-                 <div className="text-2xl font-mono text-white">#{Math.floor(Math.random() * 100)}</div>
+                 <div className="text-2xl font-mono text-white">#{rank}</div>
                </div>
             </div>
 
@@ -135,15 +139,17 @@ export function SignalDetail({ signal, onClose, onVote }: SignalDetailProps) {
               </div>
               
               {/* Engagement Signal */}
+              {signal.trending && (
               <div className="bg-[#00E5FF]/5 border border-[#00E5FF]/20 p-4 flex items-center space-x-4">
                  <div className="p-2 bg-[#00E5FF]/10 rounded-full">
                     <CheckCircle className="text-[#00E5FF]" size={20} />
                  </div>
                  <div>
                     <h4 className="text-sm font-bold text-[#00E5FF] uppercase tracking-wider mb-1">High Campus Interest</h4>
-                    <p className="text-xs text-[#00E5FF]/70 font-mono">This issue is trending in the top 5% of signals this week.</p>
+                    <p className="text-xs text-[#00E5FF]/70 font-mono">This issue is trending brightly across the campus.</p>
                  </div>
               </div>
+              )}
 
             </div>
           </div>

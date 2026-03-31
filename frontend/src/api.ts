@@ -1,4 +1,4 @@
-import { Signal, SignalStatus } from './app/types';
+import { Signal, SignalStatus, AuditLog } from './app/types';
 
 // Utility to get auth token
 export const getToken = () => localStorage.getItem('token');
@@ -20,10 +20,19 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
   const response = await fetch(url, { ...options, headers });
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
-      console.warn("Auth error", response.status);
+      console.warn("Auth map triggered", response.status);
     }
     const errText = await response.text();
-    throw new Error(errText || response.statusText);
+    let parsedMsg = errText;
+    try {
+        const json = JSON.parse(errText);
+        parsedMsg = json.message || errText;
+    } catch {}
+    
+    // Standardizing backend exceptions for the frontend
+    const errorObj = new Error(parsedMsg);
+    (errorObj as any).status = response.status;
+    throw errorObj;
   }
   return response;
 }
@@ -39,7 +48,7 @@ function mapIssueToSignal(issue: any): Signal {
     createdAt: issue.createdAt,
     trending: false, // Could be calculated based on recent votes
     hot: false,
-    reporterHash: 'Anonymous', // Simplified since the hash is private
+    reporterHash: issue.reporterAlias || 'Anon-Unknown', 
   };
 }
 
@@ -58,8 +67,26 @@ export const api = {
   },
 
   // Issues
-  async getPublicFeed(): Promise<Signal[]> {
-    const res = await fetchWithAuth('/api/issues?size=50&sort=createdAt,desc');
+  async getPublicFeed(status?: string, horizon?: string): Promise<Signal[]> {
+    let url = '/api/issues?size=50&sort=createdAt,desc';
+    if (status && status !== 'ALL') url += `&status=${status}`;
+    
+    if (horizon && horizon !== 'ALL') {
+      const now = new Date();
+      let startStr = '';
+      if (horizon === 'LAST_7_DAYS') {
+        const start = new Date(now);
+        start.setDate(start.getDate() - 7);
+        startStr = start.toISOString();
+      } else if (horizon === 'THIS_SEMESTER') {
+        // Assume fallback semester boundaries (Jan or Aug)
+        const start = new Date(now.getFullYear(), now.getMonth() >= 7 ? 7 : 0, 1);
+        startStr = start.toISOString();
+      }
+      if (startStr) url += `&startDate=${startStr}`;
+    }
+    
+    const res = await fetchWithAuth(url);
     const data = await res.json();
     return data.content.map(mapIssueToSignal);
   },
@@ -99,5 +126,11 @@ export const api = {
 
   async hideIssue(id: string): Promise<void> {
     await fetchWithAuth(`/api/issues/${id}/hide`, { method: 'POST' });
+  },
+
+  async getAuditLogs(): Promise<AuditLog[]> {
+    const res = await fetchWithAuth('/api/admin/audit?size=100&sort=createdAt,desc');
+    const data = await res.json();
+    return data.content;
   }
 };

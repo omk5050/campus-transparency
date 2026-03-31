@@ -12,11 +12,12 @@ public record IssueResponse(
         IssueStatus status,
         boolean hidden,
         int voteCount,
+        String reporterAlias,
         Instant createdAt,
         Instant updatedAt
 ) {
 
-    public static IssueResponse from(Issue issue) {
+    public static IssueResponse from(Issue issue, String reporterAlias) {
         return new IssueResponse(
                 issue.getId(),
                 issue.getTitle(),
@@ -24,6 +25,7 @@ public record IssueResponse(
                 issue.getStatus(),
                 issue.isHidden(),
                 issue.getVoteCount(),
+                reporterAlias,
                 issue.getCreatedAt(),
                 issue.getUpdatedAt()
         );

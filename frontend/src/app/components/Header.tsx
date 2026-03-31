@@ -12,7 +12,7 @@ interface HeaderProps {
 }
 
 export function Header({ sortBy, onSortChange, onSubmitClick, onAdminClick }: HeaderProps) {
-  const tabs: SortOption[] = ['TRENDING', 'TOP', 'NEW', 'UNRESOLVED'];
+  const tabs: SortOption[] = ['TRENDING', 'TOP', 'NEW'];
 
   return (
     <header className="sticky top-0 z-20 bg-[#0B0F14]/90 backdrop-blur-md border-b border-white/10">

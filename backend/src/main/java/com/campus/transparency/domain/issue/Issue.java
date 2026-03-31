@@ -96,4 +96,8 @@ public class Issue extends BaseEntity {
     public int getVoteCount() {
         return voteCount;
     }
+
+    public String getReporterHash() {
+        return reporterHash;
+    }
 }
