@@ -47,11 +47,8 @@ export default function App() {
     setSignals(prev => prev.map(s => s.id === id ? { ...s, voteCount: newCount } : s));
     
     try {
-        if (newCount > signal.voteCount) {
-             await api.upvote(id);
-        } else {
-             await api.downvote(id);
-        }
+        const delta = newCount - signal.voteCount;
+        await api.vote(id, delta);
     } catch (e) {
         toast.error("Failed to register vote");
         // Revert Optimistic
@@ -169,6 +166,7 @@ export default function App() {
                  signal={signal} 
                  index={index} 
                  onClick={handleOpenDetail} 
+                 onVote={handleVote}
                />
              ))}
            </div>

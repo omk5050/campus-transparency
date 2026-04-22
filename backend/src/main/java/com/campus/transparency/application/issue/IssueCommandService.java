@@ -78,6 +78,13 @@ public class IssueCommandService {
         issueRepository.save(issue);
     }
 
+    @Transactional
+    public void vote(Long issueId, int delta) {
+        Issue issue = getIssue(issueId);
+        issue.vote(delta);
+        issueRepository.save(issue);
+    }
+
     /* =========================
        INTERNALS
        ========================= */

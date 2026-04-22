@@ -73,6 +73,10 @@ public class Issue extends BaseEntity {
         this.voteCount--;
     }
 
+    public void vote(int delta) {
+        this.voteCount += delta;
+    }
+
     /* =========================
        READ-ONLY ACCESS
        ========================= */

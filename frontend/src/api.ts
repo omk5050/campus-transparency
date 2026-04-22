@@ -117,6 +117,10 @@ export const api = {
     await fetchWithAuth(`${BASE_URL}/issues/${id}/downvote`, { method: 'POST' });
   },
 
+  async vote(id: string, delta: number): Promise<void> {
+    await fetchWithAuth(`${BASE_URL}/issues/${id}/vote?delta=${delta}`, { method: 'POST' });
+  },
+
   // Admin Actions
   async updateStatus(id: string, status: SignalStatus): Promise<void> {
     // Determine which endpoint to call based on status

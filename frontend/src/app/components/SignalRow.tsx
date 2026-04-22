@@ -10,10 +10,11 @@ import { TrendingUp, Flame } from 'lucide-react';
 interface SignalRowProps {
   signal: Signal;
   onClick: (id: string) => void;
+  onVote: (id: string, newCount: number) => void;
   index: number;
 }
 
-export function SignalRow({ signal, onClick, index }: SignalRowProps) {
+export function SignalRow({ signal, onClick, onVote, index }: SignalRowProps) {
   const isNegative = signal.voteCount < 0;
 
   return (
@@ -29,7 +30,10 @@ export function SignalRow({ signal, onClick, index }: SignalRowProps) {
     >
       {/* Vote Column */}
       <div className="flex-shrink-0 p-4 pl-6 border-r border-white/5 w-[88px] flex justify-center">
-        <VoteControl initialVotes={signal.voteCount} />
+        <VoteControl 
+          initialVotes={signal.voteCount} 
+          onVote={(newCount) => onVote(signal.id, newCount)}
+        />
       </div>
 
       {/* Main Content */}

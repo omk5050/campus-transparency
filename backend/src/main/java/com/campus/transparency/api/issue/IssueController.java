@@ -106,6 +106,14 @@ public class IssueController {
         log.info("Downvoting issue {}", id);
         commandService.downvote(id);
     }
+    
+    @PostMapping("/{id}/vote")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
+    public void vote(@PathVariable Long id, @RequestParam int delta) {
+        log.info("Voting on issue {} with delta {}", id, delta);
+        commandService.vote(id, delta);
+    }
 
     /* =========================
        QUERIES
