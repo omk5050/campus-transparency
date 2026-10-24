@@ -195,3 +195,45 @@ Administrative application decisions are permanently captured in `organization_a
 - Timestamp
 - Action metadata / details (excluding all credentials)
 
+---
+
+## 9. Phase 2.5 — Organization Join Codes for Student/Staff Onboarding
+
+### A. Controlled Tenant Onboarding Model
+In ETHOS multi-tenancy, users cannot self-assign to an arbitrary organization or elevate their own privileges. Institutional membership is securely controlled via **Organization Join Codes**:
+
+```
+Organization Administrator (or Super Admin)
+       ↓
+POST /api/admin/join-codes
+  ├── targetRole: STUDENT | ADMIN
+  ├── maxUses: optional limit (e.g. 50 uses)
+  └── expiresInDays: optional TTL (e.g. 14 days)
+       ↓
+Cryptographically Secure Code (e.g., ALPHA-STU-7K82M)
+       ↓
+Complainant / Staff Applicant
+  ├── Validate Code: GET /api/auth/join-codes/{code}/validate (public preview: org name & role)
+  └── Register: POST /api/auth/register (username, password, joinCode)
+       ↓
+Atomic Transaction:
+  - Validates code active, unrevoked, unexpired, and usage within maxUses
+  - Confirms target organization is ACTIVE
+  - Creates User with Role & Organization derived strictly from the Join Code
+  - Increments joinCode.usedCount
+  - Issues authenticated JWT session
+```
+
+### B. Security & Isolation Invariants
+1. **Zero Client Privilege Selection:** The registration request does not accept an `organizationId` or `role`. These parameters are strictly derived server-side from the verified `OrganizationJoinCode`.
+2. **Super Admin Guardrail:** Join codes can **NEVER** be generated for `Role.SUPER_ADMIN` (`400 BAD_REQUEST`). Platform Super Admins must be provisioned through secure platform configuration.
+3. **Tenant Scoping on Code Administration:**
+   - Institutional `ADMIN` users can only generate and list join codes for their own organization.
+   - Any attempt by Admin A to revoke or view a join code belonging to Organization B fails with **`404 NOT_FOUND`**, preventing cross-tenant existence enumeration.
+4. **Suspension Cascading:** If an organization is marked `SUSPENDED` or `PENDING`, join codes belonging to that organization are immediately rejected during validation and registration.
+5. **Usage & Expiry Enforcement:**
+   - Single-use and multi-use limits are enforced atomically. Once `usedCount >= maxUses`, the code becomes exhausted.
+   - Codes past `expiresAt` or marked `revoked = true` are rejected.
+6. **Public Preview without Data Leakage:** The `/api/auth/join-codes/{code}/validate` endpoint provides only the institutional display name, type, and target role so the user can verify their organization before registration, exposing no internal credentials or counts.
+
+

@@ -1,5 +1,7 @@
 package com.campus.transparency.api.auth;
 
+import com.campus.transparency.api.organization.ValidateJoinCodeResponse;
+import com.campus.transparency.application.organization.OrganizationJoinCodeService;
 import com.campus.transparency.domain.user.User;
 import com.campus.transparency.security.CurrentUserService;
 import com.campus.transparency.security.JwtUtil;
@@ -18,17 +20,20 @@ public class AuthController {
     private final UserDetailsService userDetailsService;
     private final JwtUtil jwtUtil;
     private final CurrentUserService currentUserService;
+    private final OrganizationJoinCodeService joinCodeService;
 
     public AuthController(
             AuthenticationManager authenticationManager,
             UserDetailsService userDetailsService,
             JwtUtil jwtUtil,
-            CurrentUserService currentUserService
+            CurrentUserService currentUserService,
+            OrganizationJoinCodeService joinCodeService
     ) {
         this.authenticationManager = authenticationManager;
         this.userDetailsService = userDetailsService;
         this.jwtUtil = jwtUtil;
         this.currentUserService = currentUserService;
+        this.joinCodeService = joinCodeService;
     }
 
     @PostMapping("/login")
@@ -41,6 +46,21 @@ public class AuthController {
         final String jwt = jwtUtil.generateToken(userDetails);
 
         return new TokenResponse(jwt);
+    }
+
+    @PostMapping("/register")
+    public TokenResponse register(@Valid @RequestBody RegisterRequest request) {
+        User registeredUser = joinCodeService.registerWithJoinCode(request);
+
+        final UserDetails userDetails = userDetailsService.loadUserByUsername(registeredUser.getUsername());
+        final String jwt = jwtUtil.generateToken(userDetails);
+
+        return new TokenResponse(jwt);
+    }
+
+    @GetMapping("/join-codes/{code}/validate")
+    public ValidateJoinCodeResponse validateJoinCode(@PathVariable String code) {
+        return joinCodeService.validateJoinCode(code);
     }
 
     @GetMapping("/me")
@@ -65,3 +85,4 @@ public class AuthController {
     public record OrganizationSummaryResponse(Long id, String name, String type) {}
     public record UserProfileResponse(Long id, String username, String role, OrganizationSummaryResponse organization) {}
 }
+

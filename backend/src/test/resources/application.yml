@@ -21,3 +21,8 @@ spring:
   sql:
     init:
       mode: never
+
+app:
+  rate-limiting:
+    enabled: false
+

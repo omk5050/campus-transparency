@@ -35,6 +35,9 @@ public class SecurityConfig {
     @Value("${ALLOWED_ORIGINS:*}")
     private String allowedOrigins;
 
+    @Value("${app.rate-limiting.enabled:true}")
+    private boolean rateLimitingEnabled;
+
     public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, UserDetailsService userDetailsService) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.userDetailsService = userDetailsService;
@@ -58,6 +61,9 @@ public class SecurityConfig {
 
                         // Require SUPER_ADMIN role for organization application reviews
                         .requestMatchers("/api/admin/organization-applications", "/api/admin/organization-applications/**").hasRole("SUPER_ADMIN")
+
+                        // Require ADMIN or SUPER_ADMIN role for organization join code management
+                        .requestMatchers("/api/admin/join-codes", "/api/admin/join-codes/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                         
                         // Allow public access to view the issues feed without being logged in
                         .requestMatchers(HttpMethod.GET, "/api/issues/**").permitAll()
@@ -65,8 +71,11 @@ public class SecurityConfig {
                         // Require authentication for all other backend API requests
                         .anyRequest().authenticated())
                 .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(new RateLimitFilter(), JwtAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+
+        if (rateLimitingEnabled) {
+            http.addFilterAfter(new RateLimitFilter(), JwtAuthenticationFilter.class);
+        }
 
         return http.build();
     }
