@@ -24,6 +24,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 public class RegressionAndLifecycleIntegrationTest {
 
+    static {
+        com.campus.transparency.config.DotenvLoader.load();
+    }
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -171,7 +175,7 @@ public class RegressionAndLifecycleIntegrationTest {
 
         // Admin feed includes hidden issue
         mockMvc.perform(get("/api/issues/admin")
-                        .param("size", "100")
+                        .param("size", "500")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.[?(@.id == " + issueId + ")]").exists());

@@ -30,6 +30,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 public class CaseAssignmentIntegrationTest {
 
+    static {
+        com.campus.transparency.config.DotenvLoader.load();
+    }
+
     @Autowired
     private MockMvc mockMvc;
 

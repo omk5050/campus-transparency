@@ -40,6 +40,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 public class TenantIsolationIntegrationTest {
 
+    static {
+        com.campus.transparency.config.DotenvLoader.load();
+    }
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -283,7 +287,7 @@ public class TenantIsolationIntegrationTest {
     @WithMockUser(username = "admin", roles = {"ADMIN"})
     @DisplayName("7c. Admin feed is isolated to authenticated admin's organization")
     void adminFeedIsIsolatedToAuthenticatedAdminOrganization() throws Exception {
-        mockMvc.perform(get("/api/issues/admin").param("size", "100"))
+        mockMvc.perform(get("/api/issues/admin").param("size", "500"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.[?(@.id == " + issueOrgA.getId() + ")]").exists())
                 .andExpect(jsonPath("$.content.[?(@.id == " + issueOrgB.getId() + ")]").doesNotExist());
@@ -293,7 +297,7 @@ public class TenantIsolationIntegrationTest {
     @WithMockUser(username = "admin_org_b", roles = {"ADMIN"})
     @DisplayName("7d. Admin B feed shows only Org B issues")
     void adminBFeedShowsOnlyOrgBIssues() throws Exception {
-        mockMvc.perform(get("/api/issues/admin").param("size", "100"))
+        mockMvc.perform(get("/api/issues/admin").param("size", "500"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.[?(@.id == " + issueOrgB.getId() + ")]").exists())
                 .andExpect(jsonPath("$.content.[?(@.id == " + issueOrgA.getId() + ")]").doesNotExist());

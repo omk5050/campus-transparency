@@ -3,8 +3,8 @@ spring:
     name: campus-transparency-test
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://ep-mute-unit-a14szfx7.ap-southeast-1.aws.neon.tech/neondb?sslmode=require}
-    username: ${SPRING_DATASOURCE_USERNAME:neondb_owner}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/campus_transparency}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
     password: ${SPRING_DATASOURCE_PASSWORD:}
     driver-class-name: org.postgresql.Driver
 

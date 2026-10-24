@@ -37,3 +37,7 @@ node_modules/
 frontend/node_modules/
 backend/start-neon.bat
 *.bat.local
+.env
+*.env
+.env.*
+*.log
