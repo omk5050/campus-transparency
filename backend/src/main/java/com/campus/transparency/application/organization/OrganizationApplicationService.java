@@ -13,6 +13,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.campus.transparency.application.notification.NotificationService;
+import com.campus.transparency.domain.notification.NotificationType;
+
 @Service
 public class OrganizationApplicationService {
 
@@ -21,19 +24,22 @@ public class OrganizationApplicationService {
     private final OrganizationRepository organizationRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final NotificationService notificationService;
 
     public OrganizationApplicationService(
             OrganizationApplicationRepository applicationRepository,
             OrganizationApplicationAuditLogRepository auditLogRepository,
             OrganizationRepository organizationRepository,
             UserRepository userRepository,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            NotificationService notificationService
     ) {
         this.applicationRepository = applicationRepository;
         this.auditLogRepository = auditLogRepository;
         this.organizationRepository = organizationRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -143,6 +149,17 @@ public class OrganizationApplicationService {
                 superAdminUsername,
                 "Approved organization: " + savedOrg.getName() + " (ID: " + savedOrg.getId() + ") with admin user: " + adminUser.getUsername()
         ));
+
+        // 5. In-App Notification to new Organization Admin
+        notificationService.createNotification(
+                adminUser,
+                savedOrg,
+                NotificationType.ORGANIZATION_APPLICATION_APPROVED,
+                "Organization Approved",
+                "Your organization application for " + savedOrg.getName() + " has been approved.",
+                "ORGANIZATION_APPLICATION",
+                updatedApp.getId()
+        );
 
         return OrganizationApplicationResponse.from(updatedApp);
     }

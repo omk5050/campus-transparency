@@ -18,21 +18,27 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+import com.campus.transparency.application.notification.NotificationService;
+import com.campus.transparency.domain.notification.NotificationType;
+
 @Service
 public class IssueMessageService {
 
     private final IssueMessageRepository messageRepository;
     private final IssueRepository issueRepository;
     private final AuditLogRepository auditLogRepository;
+    private final NotificationService notificationService;
 
     public IssueMessageService(
             IssueMessageRepository messageRepository,
             IssueRepository issueRepository,
-            AuditLogRepository auditLogRepository
+            AuditLogRepository auditLogRepository,
+            NotificationService notificationService
     ) {
         this.messageRepository = messageRepository;
         this.issueRepository = issueRepository;
         this.auditLogRepository = auditLogRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -77,6 +83,18 @@ public class IssueMessageService {
                 "ISSUE_MESSAGE_SENT",
                 currentUser.getUsername() + " (Message ID: " + saved.getId() + ")"
         ));
+
+        if (issue.getAssignedTo() != null && !issue.getAssignedTo().getId().equals(currentUser.getId())) {
+            notificationService.createNotification(
+                    issue.getAssignedTo(),
+                    issue.getOrganization(),
+                    NotificationType.INTERNAL_MESSAGE_RECEIVED,
+                    "New Case Message",
+                    "A new internal message was sent on case #" + issue.getId() + ".",
+                    "ISSUE",
+                    issue.getId()
+            );
+        }
 
         return IssueMessageResponse.from(saved);
     }

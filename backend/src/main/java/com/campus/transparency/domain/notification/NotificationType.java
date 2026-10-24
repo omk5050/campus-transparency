@@ -1,0 +1,13 @@
+package com.campus.transparency.domain.notification;
+
+public enum NotificationType {
+    ISSUE_CREATED,
+    ISSUE_STATUS_CHANGED,
+    ISSUE_ASSIGNED,
+    ISSUE_UNASSIGNED,
+    ISSUE_RESOLVED,
+    ISSUE_REJECTED,
+    INTERNAL_MESSAGE_RECEIVED,
+    ORGANIZATION_APPLICATION_APPROVED,
+    ORGANIZATION_APPLICATION_REJECTED
+}

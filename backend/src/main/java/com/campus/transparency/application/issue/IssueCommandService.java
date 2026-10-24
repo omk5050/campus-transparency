@@ -12,6 +12,8 @@ import com.campus.transparency.domain.user.UserRepository;
 import com.campus.transparency.security.CurrentUserService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import com.campus.transparency.application.notification.NotificationService;
+import com.campus.transparency.domain.notification.NotificationType;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -21,17 +23,20 @@ public class IssueCommandService {
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
     private final CurrentUserService currentUserService;
+    private final NotificationService notificationService;
 
     public IssueCommandService(
             IssueRepository issueRepository,
             AuditLogRepository auditLogRepository,
             UserRepository userRepository,
-            CurrentUserService currentUserService
+            CurrentUserService currentUserService,
+            NotificationService notificationService
     ) {
         this.issueRepository = issueRepository;
         this.auditLogRepository = auditLogRepository;
         this.userRepository = userRepository;
         this.currentUserService = currentUserService;
+        this.notificationService = notificationService;
     }
 
     
@@ -137,6 +142,17 @@ public class IssueCommandService {
 
         String actor = (adminActor != null && !adminActor.isBlank()) ? adminActor : "admin";
         auditLogRepository.save(new AuditLog(issue, "ISSUE_ASSIGNED", actor + " (assigned to " + user.getUsername() + ")"));
+
+        notificationService.createNotification(
+                user,
+                issue.getOrganization(),
+                NotificationType.ISSUE_ASSIGNED,
+                "Case Assigned",
+                "You have been assigned to case #" + issue.getId() + ".",
+                "ISSUE",
+                issue.getId()
+        );
+
         return issue;
     }
 
@@ -150,6 +166,19 @@ public class IssueCommandService {
         String actor = (adminActor != null && !adminActor.isBlank()) ? adminActor : "admin";
         String details = previousAssignee != null ? " (unassigned from " + previousAssignee.getUsername() + ")" : "";
         auditLogRepository.save(new AuditLog(issue, "ISSUE_UNASSIGNED", actor + details));
+
+        if (previousAssignee != null) {
+            notificationService.createNotification(
+                    previousAssignee,
+                    issue.getOrganization(),
+                    NotificationType.ISSUE_UNASSIGNED,
+                    "Case Unassigned",
+                    "You were unassigned from case #" + issue.getId() + ".",
+                    "ISSUE",
+                    issue.getId()
+            );
+        }
+
         return issue;
     }
 
@@ -179,6 +208,34 @@ public class IssueCommandService {
         issue.transitionTo(targetStatus);   // ✅ DOMAIN ENFORCES RULES
         issueRepository.save(issue);
         auditLogRepository.save(new AuditLog(issue, action, actor));
+
+        if (issue.getAssignedTo() != null) {
+            NotificationType notifType;
+            String title;
+            String message;
+            if (targetStatus == IssueStatus.RESOLVED) {
+                notifType = NotificationType.ISSUE_RESOLVED;
+                title = "Case Resolved";
+                message = "Case #" + issue.getId() + " has been marked as resolved.";
+            } else if (targetStatus == IssueStatus.REJECTED) {
+                notifType = NotificationType.ISSUE_REJECTED;
+                title = "Case Rejected";
+                message = "Case #" + issue.getId() + " has been rejected.";
+            } else {
+                notifType = NotificationType.ISSUE_STATUS_CHANGED;
+                title = "Case Status Updated";
+                message = "Status of case #" + issue.getId() + " changed to " + targetStatus + ".";
+            }
+            notificationService.createNotification(
+                    issue.getAssignedTo(),
+                    issue.getOrganization(),
+                    notifType,
+                    title,
+                    message,
+                    "ISSUE",
+                    issue.getId()
+            );
+        }
     }
 }
 

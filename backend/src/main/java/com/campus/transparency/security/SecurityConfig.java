@@ -69,8 +69,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/issues/*/internal-notes", "/api/issues/*/internal-notes/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .requestMatchers("/api/issues/*/messages", "/api/issues/*/messages/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                         
+                        // Require authentication for notification endpoints
+                        .requestMatchers("/api/notifications", "/api/notifications/**").authenticated()
+
                         // Allow public access to view the issues feed without being logged in
-                        .requestMatchers(HttpMethod.GET, "/api/issues/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/issues", "/api/issues/**").permitAll()
 
                         // Require authentication for all other backend API requests
                         .anyRequest().authenticated())

@@ -89,6 +89,7 @@ import {
   voteIssue,
   hideIssue,
   getCurrentUser,
+  getUnreadNotificationCount,
   UserProfileResponse,
   ApiError,
 } from "./api";
@@ -5355,9 +5356,25 @@ export default function App() {
     }
   };
 
-  const unreadNotifications = notifications.filter(
-    (n) => !n.readAt && n.recipientType === "INVESTIGATOR",
-  ).length;
+  const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
+
+  const refreshUnreadCount = async () => {
+    if (!isAuthenticated()) return;
+    try {
+      const res = await getUnreadNotificationCount();
+      setUnreadNotifications(res.unreadCount);
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated()) {
+      refreshUnreadCount();
+      const interval = setInterval(refreshUnreadCount, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [appState, orgView]);
 
 
   // Keyboard shortcuts
@@ -5559,8 +5576,7 @@ export default function App() {
             )}
             {orgView === "NOTIFICATIONS" && (
               <NotificationsPanel
-                notifications={notifications}
-                onNotificationUpdate={() => setNotifications([...notifications])}
+                onNotificationUpdate={refreshUnreadCount}
                 onOpenCase={(id) => { setSelectedReportId(id); setOrgView("DETAIL"); }}
               />
             )}

@@ -753,5 +753,69 @@ export async function deleteIssueMessage(
   });
 }
 
+// ─── In-App Notifications ─────────────────────────────────────────────────────
+
+export type BackendNotificationType =
+  | 'ISSUE_CREATED'
+  | 'ISSUE_STATUS_CHANGED'
+  | 'ISSUE_ASSIGNED'
+  | 'ISSUE_UNASSIGNED'
+  | 'ISSUE_RESOLVED'
+  | 'ISSUE_REJECTED'
+  | 'INTERNAL_MESSAGE_RECEIVED'
+  | 'ORGANIZATION_APPLICATION_APPROVED'
+  | 'ORGANIZATION_APPLICATION_REJECTED';
+
+export interface NotificationResponse {
+  id: number;
+  recipientId: number;
+  organizationId?: number | null;
+  type: BackendNotificationType;
+  title: string;
+  message: string;
+  entityType?: string | null;
+  entityId?: number | null;
+  isRead: boolean;
+  createdAt: string;
+  readAt?: string | null;
+}
+
+export interface UnreadCountResponse {
+  unreadCount: number;
+}
+
+/** GET /api/notifications — Retrieve notifications for authenticated user */
+export async function getNotifications(params: {
+  unreadOnly?: boolean;
+  page?: number;
+  size?: number;
+} = {}): Promise<SpringPage<NotificationResponse>> {
+  const { unreadOnly, page = 0, size = 50 } = params;
+  const query = buildQuery({ unreadOnly, page, size, sort: 'createdAt,desc' });
+  return request<SpringPage<NotificationResponse>>(`/notifications${query}`);
+}
+
+/** GET /api/notifications/unread-count — Retrieve unread notification count */
+export async function getUnreadNotificationCount(): Promise<UnreadCountResponse> {
+  return request<UnreadCountResponse>('/notifications/unread-count');
+}
+
+/** POST /api/notifications/{id}/read — Mark a notification as read */
+export async function markNotificationRead(
+  id: number | string,
+): Promise<NotificationResponse> {
+  return request<NotificationResponse>(`/notifications/${id}/read`, {
+    method: 'POST',
+  });
+}
+
+/** POST /api/notifications/read-all — Mark all notifications as read */
+export async function markAllNotificationsRead(): Promise<void> {
+  return request<void>('/notifications/read-all', {
+    method: 'POST',
+  });
+}
+
 // Re-export ApiError so callers can instanceof-check it
 export { ApiError };
+
