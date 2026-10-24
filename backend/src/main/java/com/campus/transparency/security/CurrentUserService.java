@@ -34,10 +34,17 @@ public class CurrentUserService {
         if (org == null) {
             throw new AccessDeniedException("User does not belong to any organization");
         }
+        if (org.getStatus() != com.campus.transparency.domain.organization.OrganizationStatus.ACTIVE) {
+            throw new AccessDeniedException("Organization is not active: " + org.getStatus());
+        }
         return org;
     }
 
     public Long getCurrentOrganizationId() {
         return getCurrentOrganization().getId();
+    }
+
+    public boolean isSuperAdmin() {
+        return getCurrentUser().getRole() == com.campus.transparency.domain.user.Role.SUPER_ADMIN;
     }
 }

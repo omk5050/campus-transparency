@@ -106,9 +106,8 @@ The additive migration `V5__add_multi_organization_foundation.sql` was safely ap
 
 ## 7. Future Phases Dependent on This Multi-Tenant Foundation
 
-The Phase 2.3 foundation leaves clean extension points for subsequent phases:
-- **Phase 2.4+:**
-  - Organization registration & Super Admin approval workflows (`PENDING`, `ACTIVE`, `REJECTED`).
+The multi-tenant foundation leaves clean extension points for subsequent phases:
+- **Phase 2.5+:**
   - Organization join codes for student/staff onboarding.
   - Anonymous identity redesign (complaint-specific privacy-preserving identifiers).
   - Internal Notes & Investigator Messaging (strictly scoped by `organization_id`).
@@ -116,3 +115,83 @@ The Phase 2.3 foundation leaves clean extension points for subsequent phases:
   - Multi-tenant Notifications.
   - Public Aggregate Transparency Statistics & Leaderboards.
   - Official ETHOS Platform Forum & Announcement Channels.
+
+---
+
+## 8. Phase 2.4 — Organization Registration & Super Admin Approval
+
+### A. Lifecycle Architecture & Controlled Onboarding
+To maintain institutional integrity, organizations are onboarded through a multi-stage approval pipeline:
+
+```
+Public Applicant
+      ↓
+POST /api/organization-applications
+      ↓
+Status: PENDING (organization_applications table)
+      ↓
+SUPER_ADMIN Review (GET /api/admin/organization-applications)
+   ├── APPROVE (POST /api/admin/organization-applications/{id}/approve)
+   │     ↓
+   │   Atomic Transaction:
+   │   - Create Organization (status: ACTIVE)
+   │   - Create Org Admin User (role: ADMIN, org_id: new_org.id)
+   │   - Update Application (status: APPROVED, reviewed_by, reviewed_at, approved_organization_id)
+   │   - Record Audit Log (action: APPROVED)
+   │
+   └── REJECT (POST /api/admin/organization-applications/{id}/reject)
+         ↓
+       - Update Application (status: REJECTED, rejection_reason, reviewed_by, reviewed_at)
+       - Record Audit Log (action: REJECTED)
+       - NO organization or user account is created
+```
+
+> **CRITICAL RULE:** Organization applications **DO NOT automatically activate an organization or create usable users**. The application record is purely an onboarding request until explicitly approved by a platform `SUPER_ADMIN`.
+
+### B. Role-to-Organization Relationship
+The platform enforces strict role-to-organization boundaries:
+- **`SUPER_ADMIN`:**
+  - Platform-wide governance authority.
+  - `organization_id = NULL`.
+  - Authorized to list, inspect, approve, and reject organization applications.
+  - Does NOT belong to any single organization tenant.
+  - Bootstrapped securely via environment configuration; can never be registered through public registration endpoints.
+- **`ORG_ADMIN` (`ADMIN`):**
+  - Institutional administrative authority.
+  - `organization_id = organization X` (`NOT NULL`).
+  - Manages only their designated organization's complaints, investigators, and workflows.
+  - Prohibited from accessing or reviewing organization applications (enforced with `403 FORBIDDEN`).
+- **`STUDENT` / Investigator:**
+  - `organization_id = organization X` (`NOT NULL`).
+  - Strictly tenant-scoped. Prohibited from administrative review endpoints.
+
+### C. Password Security
+- Passwords for the requested organization administrator are validated against the platform's password policy (minimum 8 characters, requiring at least one letter, one digit, and one special character).
+- Immediately upon submission, passwords are hashed using `BCryptPasswordEncoder`.
+- Passwords are **never stored in plaintext**.
+- Passwords and password hashes are **never returned in API responses** (omitted in `OrganizationApplicationResponse`) and are excluded from audit log records.
+
+### D. Transactional Approval
+- Approval is strictly atomic (`@Transactional`).
+- If organization creation, admin account creation, or application state updates fail, the entire transaction rolls back.
+- No orphan users or inactive partial organizations are left behind.
+- Idempotency / state machine protections: Applications in `APPROVED` or `REJECTED` states cannot be approved or rejected again (`IllegalStateException` / `400 BAD_REQUEST`).
+
+### E. Mandatory Rejection Reason
+- Rejection requires a non-blank reason (`RejectOrganizationApplicationRequest.reason`).
+- The reason is permanently stored in `rejection_reason` and recorded in the audit log.
+- Rejected applicants cannot log in, as no user account is ever created.
+
+### F. Organization Inactivity / Suspension Enforcement
+- Spring Security's `CustomUserDetailsService` verifies organization status during authentication:
+  - Users belonging to an organization with status other than `ACTIVE` (e.g. `SUSPENDED` or `PENDING`) are automatically denied login (`DisabledException` -> `401 UNAUTHORIZED`).
+  - `SUPER_ADMIN` accounts (`organization_id = NULL`) bypass tenant suspension checks.
+
+### G. Audit Logging
+Administrative application decisions are permanently captured in `organization_application_audit_logs`:
+- Application ID
+- Action (`SUBMITTED`, `APPROVED`, `REJECTED`)
+- Acting Super Admin username
+- Timestamp
+- Action metadata / details (excluding all credentials)
+

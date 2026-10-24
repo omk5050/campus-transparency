@@ -159,7 +159,8 @@ public class CaseAssignmentIntegrationTest {
         issueRepository.save(testIssue);
 
         mockMvc.perform(get("/api/issues/admin")
-                        .param("department", "Academic Affairs"))
+                        .param("department", "Academic Affairs")
+                        .param("size", "100"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.[?(@.id == " + testIssue.getId() + ")]").exists());
 

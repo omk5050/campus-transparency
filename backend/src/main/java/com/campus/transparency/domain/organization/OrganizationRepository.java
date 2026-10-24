@@ -8,4 +8,6 @@ import java.util.Optional;
 @Repository
 public interface OrganizationRepository extends JpaRepository<Organization, Long> {
     Optional<Organization> findByName(String name);
+    boolean existsByNameIgnoreCase(String name);
+    boolean existsByOfficialEmailIgnoreCase(String officialEmail);
 }

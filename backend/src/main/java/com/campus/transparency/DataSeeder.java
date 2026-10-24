@@ -83,8 +83,18 @@ public class DataSeeder implements CommandLineRunner {
             System.out.println("Seeded investigator user: investigator/investigator123");
         }
 
+        if (userRepository.findByRole(Role.SUPER_ADMIN).isEmpty()) {
+            String superAdminUsername = System.getProperty("SUPER_ADMIN_USERNAME", 
+                    System.getenv().getOrDefault("SUPER_ADMIN_USERNAME", "superadmin"));
+            String superAdminPassword = System.getProperty("SUPER_ADMIN_PASSWORD", 
+                    System.getenv().getOrDefault("SUPER_ADMIN_PASSWORD", "superadmin123"));
+            User superAdmin = new User(superAdminUsername, passwordEncoder.encode(superAdminPassword), Role.SUPER_ADMIN, null);
+            userRepository.save(superAdmin);
+            System.out.println("Seeded platform SUPER_ADMIN: " + superAdminUsername);
+        }
+
         userRepository.findAll().forEach(u -> {
-            if (u.getOrganization() == null) {
+            if (u.getRole() != Role.SUPER_ADMIN && u.getOrganization() == null) {
                 u.setOrganization(defaultOrg);
                 userRepository.save(u);
             }

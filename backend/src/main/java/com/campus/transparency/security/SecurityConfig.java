@@ -52,6 +52,12 @@ public class SecurityConfig {
 
                         // Allow public access to authentication endpoints
                         .requestMatchers("/api/auth/**").permitAll()
+
+                        // Allow public submission of organization applications
+                        .requestMatchers(HttpMethod.POST, "/api/organization-applications").permitAll()
+
+                        // Require SUPER_ADMIN role for organization application reviews
+                        .requestMatchers("/api/admin/organization-applications", "/api/admin/organization-applications/**").hasRole("SUPER_ADMIN")
                         
                         // Allow public access to view the issues feed without being logged in
                         .requestMatchers(HttpMethod.GET, "/api/issues/**").permitAll()

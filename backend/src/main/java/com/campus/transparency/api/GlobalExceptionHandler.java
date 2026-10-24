@@ -59,10 +59,23 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("FORBIDDEN", ex.getMessage());
     }
 
+    @ExceptionHandler(org.springframework.security.authentication.DisabledException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErrorResponse handleDisabled(org.springframework.security.authentication.DisabledException ex) {
+        return new ErrorResponse("UNAUTHORIZED", ex.getMessage());
+    }
+
+    @ExceptionHandler(org.springframework.security.authentication.BadCredentialsException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErrorResponse handleBadCredentials(org.springframework.security.authentication.BadCredentialsException ex) {
+        return new ErrorResponse("UNAUTHORIZED", "Invalid username or password");
+    }
+
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ErrorResponse handleOther(Exception ex) {
-        return new ErrorResponse("INTERNAL_SERVER_ERROR", "Internal server error");
+        ex.printStackTrace();
+        return new ErrorResponse("INTERNAL_SERVER_ERROR", ex.getMessage() != null ? ex.getMessage() : "Internal server error");
     }
 
     public record ErrorResponse(String code, String message, Instant timestamp) {
