@@ -1,422 +1,516 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { format } from 'date-fns';
 import {
-  Send, Paperclip, Info, Clock, Shield, User, ChevronDown,
-  Lock, MessageSquare, FileText, AlertTriangle, Check, Plus, X,
+  Send,
+  Lock,
+  MessageSquare,
+  FileText,
+  AlertTriangle,
+  Check,
+  Plus,
+  X,
+  Edit2,
+  Trash2,
+  User,
+  Shield,
+  Loader2,
 } from 'lucide-react';
-import { clsx } from 'clsx';
 import { toast } from 'sonner';
-import type { Message, InternalNote, MessageType } from '../types';
-import { sendMessage as svcSend, addInternalNote as svcAddNote, markMessagesRead, getMessages, getInternalNotes } from '../services';
+import {
+  getIssueMessages,
+  sendIssueMessage,
+  updateIssueMessage,
+  deleteIssueMessage,
+  getInternalNotes,
+  createInternalNote,
+  updateInternalNote,
+  deleteInternalNote,
+  getCurrentUser,
+  IssueMessageResponse,
+  InternalNoteResponse,
+  ApiError,
+} from '../api';
 
 const C = {
-  bg: '#08090E', surface: '#0F1117', surface2: '#161921', surface3: '#1D2029',
-  border: '#1E222B', border2: '#2D3140', cyan: '#00C8E8', text: '#E2E5EE',
-  textSub: '#8A8FA8', textDim: '#52576A', emerald: '#10B981', amber: '#F59E0B',
-  blue: '#38BDF8', violet: '#8B5CF6', rose: '#F43F5E', orange: '#F97316',
+  bg: '#08090E',
+  surface: '#0F1117',
+  surface2: '#161921',
+  surface3: '#1D2029',
+  border: '#1E222B',
+  border2: '#2D3140',
+  cyan: '#00C8E8',
+  text: '#E2E5EE',
+  textSub: '#8A8FA8',
+  textDim: '#52576A',
+  emerald: '#10B981',
+  amber: '#F59E0B',
+  blue: '#38BDF8',
+  violet: '#8B5CF6',
+  rose: '#F43F5E',
+  orange: '#F97316',
 } as const;
 
-const MSG_TYPE_META: Record<MessageType, { label: string; color: string; icon: React.ReactNode }> = {
-  MESSAGE: { label: 'Message', color: C.text, icon: <MessageSquare size={11} /> },
-  INFORMATION_REQUEST: { label: 'Information Requested', color: C.amber, icon: <AlertTriangle size={11} /> },
-  EVIDENCE_REQUEST: { label: 'Evidence Requested', color: C.orange, icon: <Paperclip size={11} /> },
-  SYSTEM_UPDATE: { label: 'System Update', color: C.cyan, icon: <Info size={11} /> },
-};
+// ─── Investigator Messaging Component ──────────────────────────────────────────
 
-function MessageBubble({ msg, isAdmin }: { msg: Message; isAdmin: boolean }) {
-  const isTeam = msg.senderType === 'INVESTIGATION_TEAM';
-  const isSystem = msg.senderType === 'SYSTEM';
-  const meta = MSG_TYPE_META[msg.messageType];
+interface CaseCommunicationProps {
+  caseId: string | number;
+  isAdmin?: boolean;
+}
 
-  if (isSystem) {
-    return (
-      <div className="flex justify-center py-2">
-        <div className="flex items-center gap-2 px-4 py-2 border" style={{ borderColor: `${C.cyan}28`, background: `${C.cyan}06` }}>
-          <Info size={11} style={{ color: C.cyan }} />
-          <span className="font-mono text-[10px]" style={{ color: C.textSub }}>{msg.content}</span>
-          <span className="font-mono text-[9px]" style={{ color: C.textDim }}>{format(new Date(msg.createdAt), 'dd MMM, HH:mm')}</span>
-        </div>
-      </div>
-    );
-  }
+export function CaseCommunication({ caseId }: CaseCommunicationProps) {
+  const [messages, setMessages] = useState<IssueMessageResponse[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [currentUsername, setCurrentUsername] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-  const isRight = isAdmin ? isTeam : !isTeam;
+  const fetchMessages = async () => {
+    setLoading(true);
+    try {
+      const msgs = await getIssueMessages(caseId);
+      setMessages(msgs);
+    } catch (err) {
+      // 403 or 404 is expected if user does not have permission
+      if (err instanceof ApiError && (err.status === 403 || err.status === 404)) {
+        setMessages([]);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMessages();
+    getCurrentUser()
+      .then((user) => setCurrentUsername(user.username))
+      .catch(() => {});
+  }, [caseId]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages.length]);
+
+  const handleSend = async () => {
+    if (!draft.trim()) return;
+    setSending(true);
+    try {
+      const created = await sendIssueMessage(caseId, draft.trim());
+      setMessages((prev) => [...prev, created]);
+      setDraft('');
+      toast.success('Message sent to case investigators');
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : 'Failed to send message.';
+      toast.error(msg);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleStartEdit = (msg: IssueMessageResponse) => {
+    setEditingId(msg.id);
+    setEditContent(msg.content);
+  };
+
+  const handleSaveEdit = async (messageId: number) => {
+    if (!editContent.trim()) return;
+    try {
+      const updated = await updateIssueMessage(caseId, messageId, editContent.trim());
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? updated : m)));
+      setEditingId(null);
+      setEditContent('');
+      toast.success('Message updated');
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : 'Failed to update message.';
+      toast.error(msg);
+    }
+  };
+
+  const handleDelete = async (messageId: number) => {
+    if (!confirm('Are you sure you want to delete this message?')) return;
+    try {
+      await deleteIssueMessage(caseId, messageId);
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      toast.success('Message deleted');
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : 'Failed to delete message.';
+      toast.error(msg);
+    }
+  };
 
   return (
-    <div className={clsx('flex gap-3 py-2', isRight ? 'justify-end' : 'justify-start')}>
-      {!isRight && (
-        <div className="w-7 h-7 flex items-center justify-center border flex-shrink-0 mt-1" style={{ borderColor: C.border2, background: C.surface2 }}>
-          {isTeam ? <Shield size={13} style={{ color: C.cyan }} /> : <User size={13} style={{ color: C.textSub }} />}
+    <div className="flex flex-col border" style={{ background: C.bg, borderColor: C.border }}>
+      {/* Header */}
+      <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: C.border, background: C.surface }}>
+        <div className="flex items-center gap-3">
+          <MessageSquare size={16} style={{ color: C.cyan }} />
+          <div>
+            <div className="font-mono text-xs uppercase tracking-widest font-bold" style={{ color: C.text }}>
+              Investigator Messages
+            </div>
+            <div className="font-mono text-[10px]" style={{ color: C.textDim }}>
+              Internal communication related to this case. Visible only to authorized case managers.
+            </div>
+          </div>
         </div>
-      )}
-      <div className="max-w-[72%]">
-        <div className="flex items-baseline gap-2 mb-1" style={{ justifyContent: isRight ? 'flex-end' : 'flex-start' }}>
-          <span className="font-mono text-[9px] uppercase tracking-widest" style={{ color: isTeam ? C.cyan : C.textSub }}>
-            {isTeam ? 'Investigation Team' : 'Anonymous Reporter'}
+        <div className="flex items-center gap-2">
+          <Lock size={12} style={{ color: C.emerald }} />
+          <span className="font-mono text-[10px]" style={{ color: C.emerald }}>
+            Internal Case Channel
           </span>
-          <span className="font-mono text-[9px]" style={{ color: C.textDim }}>{format(new Date(msg.createdAt), 'dd MMM, HH:mm')}</span>
-          {msg.readAt && <Check size={9} style={{ color: C.emerald }} />}
         </div>
+      </div>
 
-        {msg.messageType !== 'MESSAGE' && (
-          <div className="flex items-center gap-1.5 mb-1.5 px-2 py-1 border" style={{ borderColor: `${meta.color}30`, background: `${meta.color}08` }}>
-            <span style={{ color: meta.color }}>{meta.icon}</span>
-            <span className="font-mono text-[9px] uppercase tracking-widest" style={{ color: meta.color }}>{meta.label}</span>
-            {msg.requestDeadline && (
-              <span className="ml-auto font-mono text-[9px] flex items-center gap-1" style={{ color: C.textDim }}>
-                <Clock size={9} />Due {format(new Date(msg.requestDeadline), 'dd MMM')}
-              </span>
-            )}
+      {/* Messages Scroll Area */}
+      <div className="p-6 space-y-4 max-h-96 overflow-y-auto" style={{ background: C.surface2 }}>
+        {loading ? (
+          <div className="flex items-center justify-center py-10 font-mono text-xs" style={{ color: C.textDim }}>
+            <Loader2 size={16} className="animate-spin mr-2" /> Loading messages…
           </div>
-        )}
+        ) : messages.length === 0 ? (
+          <div className="text-center py-8 font-mono text-xs space-y-1" style={{ color: C.textDim }}>
+            <MessageSquare size={24} className="mx-auto mb-2 opacity-30" />
+            <p>No investigator messages recorded yet.</p>
+            <p className="text-[10px]">Use the input below to start private coordination on this case.</p>
+          </div>
+        ) : (
+          messages.map((msg) => {
+            const isOwn = currentUsername === msg.senderUsername;
+            return (
+              <div
+                key={msg.id}
+                className={`flex flex-col max-w-[85%] ${isOwn ? 'ml-auto items-end' : 'mr-auto items-start'}`}
+              >
+                <div className="flex items-center gap-2 mb-1 font-mono text-[10px]" style={{ color: C.textDim }}>
+                  <span className="font-bold" style={{ color: isOwn ? C.cyan : C.textSub }}>
+                    {msg.senderUsername}
+                  </span>
+                  <span>{format(new Date(msg.createdAt), 'dd MMM, HH:mm')}</span>
+                  {msg.updatedAt && msg.updatedAt !== msg.createdAt && (
+                    <span className="text-[9px] italic">(edited)</span>
+                  )}
+                  {isOwn && editingId !== msg.id && (
+                    <button
+                      onClick={() => handleStartEdit(msg)}
+                      className="hover:opacity-100 opacity-60 p-0.5"
+                      title="Edit message"
+                    >
+                      <Edit2 size={10} />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleDelete(msg.id)}
+                    className="hover:text-rose-400 opacity-60 p-0.5"
+                    title="Delete message"
+                  >
+                    <Trash2 size={10} />
+                  </button>
+                </div>
 
-        <div
-          className="px-4 py-3 font-mono text-xs leading-relaxed"
-          style={{
-            background: isRight ? `${C.cyan}12` : C.surface2,
-            borderLeft: isRight ? 'none' : `2px solid ${isTeam ? C.cyan : C.textDim}`,
-            color: C.textSub,
-          }}
-        >
-          {msg.content}
-        </div>
-
-        {msg.attachments && msg.attachments.length > 0 && (
-          <div className="mt-1 space-y-1">
-            {msg.attachments.map((a, i) => (
-              <div key={i} className="flex items-center gap-2 px-3 py-1.5 border" style={{ borderColor: C.border, background: C.surface }}>
-                <Paperclip size={11} style={{ color: C.textDim }} />
-                <span className="font-mono text-[10px]" style={{ color: C.textSub }}>{a}</span>
+                {editingId === msg.id ? (
+                  <div className="w-full space-y-2 p-3 border" style={{ background: C.surface, borderColor: C.cyan }}>
+                    <textarea
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      rows={2}
+                      className="w-full p-2 font-mono text-xs border bg-transparent outline-none"
+                      style={{ borderColor: C.border, color: C.text }}
+                    />
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="px-2 py-1 font-mono text-[10px] uppercase tracking-wider border"
+                        style={{ borderColor: C.border, color: C.textDim }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleSaveEdit(msg.id)}
+                        className="px-3 py-1 font-mono text-[10px] uppercase tracking-wider font-bold"
+                        style={{ background: C.cyan, color: C.bg }}
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className="p-3.5 border font-mono text-xs leading-relaxed"
+                    style={{
+                      background: isOwn ? `${C.cyan}0A` : C.surface,
+                      borderColor: isOwn ? `${C.cyan}40` : C.border,
+                      color: C.text,
+                    }}
+                  >
+                    {msg.content}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
+            );
+          })
         )}
-      </div>
-      {isRight && (
-        <div className="w-7 h-7 flex items-center justify-center border flex-shrink-0 mt-1" style={{ borderColor: C.border2, background: C.surface2 }}>
-          {isTeam ? <Shield size={13} style={{ color: C.cyan }} /> : <User size={13} style={{ color: C.textSub }} />}
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface InfoRequestFormProps {
-  onSend: (content: string, type: MessageType, deadline?: string) => void;
-  onClose: () => void;
-}
-
-function InfoRequestForm({ onSend, onClose }: InfoRequestFormProps) {
-  const [content, setContent] = useState('');
-  const [requestType, setRequestType] = useState<MessageType>('INFORMATION_REQUEST');
-  const [deadline, setDeadline] = useState('');
-
-  const types: { id: MessageType; label: string }[] = [
-    { id: 'INFORMATION_REQUEST', label: 'Information Request' },
-    { id: 'EVIDENCE_REQUEST', label: 'Evidence Request' },
-    { id: 'MESSAGE', label: 'General Message' },
-  ];
-
-  return (
-    <div className="border p-5 space-y-4" style={{ borderColor: `${C.amber}28`, background: `${C.amber}04` }}>
-      <div className="flex items-center justify-between">
-        <div className="font-mono text-xs uppercase tracking-widest" style={{ color: C.amber }}>Request More Information</div>
-        <button onClick={onClose} style={{ color: C.textDim }}><X size={14} /></button>
+        <div ref={bottomRef} />
       </div>
 
-      <div className="flex gap-2">
-        {types.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setRequestType(t.id)}
-            className="px-3 py-1.5 border font-mono text-[10px] uppercase tracking-widest transition-all"
-            style={{
-              borderColor: requestType === t.id ? C.amber : C.border,
-              color: requestType === t.id ? C.amber : C.textDim,
-              background: requestType === t.id ? `${C.amber}0C` : 'transparent',
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      <textarea
-        value={content}
-        onChange={e => setContent(e.target.value)}
-        rows={3}
-        placeholder="Describe what information or evidence is needed..."
-        className="w-full px-4 py-3 font-mono text-xs border bg-transparent outline-none resize-none leading-relaxed"
-        style={{ borderColor: C.border, color: C.text }}
-        autoFocus
-      />
-
-      <div>
-        <label className="block font-mono text-[10px] uppercase tracking-widest mb-1.5" style={{ color: C.textDim }}>
-          Response deadline (optional)
-        </label>
-        <input
-          type="date"
-          value={deadline}
-          onChange={e => setDeadline(e.target.value)}
-          className="px-3 py-2 border font-mono text-xs bg-transparent outline-none"
+      {/* Compose */}
+      <div className="p-4 border-t flex gap-3" style={{ borderColor: C.border, background: C.surface }}>
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
+          placeholder="Send an internal message to case investigators (Press Enter to send)…"
+          rows={2}
+          disabled={sending}
+          className="flex-1 p-3 font-mono text-xs border bg-transparent outline-none resize-none leading-relaxed"
           style={{ borderColor: C.border, color: C.text }}
         />
-      </div>
-
-      <div className="flex justify-end gap-3">
-        <button onClick={onClose} className="font-mono text-xs uppercase tracking-widest" style={{ color: C.textDim }}>Cancel</button>
         <button
-          onClick={() => { if (content.trim()) { onSend(content, requestType, deadline || undefined); onClose(); } }}
-          disabled={!content.trim()}
-          className="flex items-center gap-2 px-4 py-2 font-mono text-xs uppercase tracking-widest disabled:opacity-40"
-          style={{ background: C.amber, color: C.bg }}
+          onClick={handleSend}
+          disabled={sending || !draft.trim()}
+          className="px-5 font-mono text-xs uppercase tracking-widest font-bold flex items-center justify-center gap-2 disabled:opacity-40 transition-opacity"
+          style={{ background: C.cyan, color: C.bg }}
         >
-          <Send size={11} /> Send Request
+          {sending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+          <span>Send</span>
         </button>
       </div>
     </div>
   );
 }
 
-// ─── Communication Panel ──────────────────────────────────────────────────────
+// ─── Internal Notes Component ──────────────────────────────────────────────────
 
-interface CaseCommunicationProps {
-  caseId: string;
-  isAdmin: boolean;
-  messages?: Message[];
-  onMessageSent?: (msg: Message) => void;
+interface InternalNotesPanelProps {
+  caseId: string | number;
 }
 
-export function CaseCommunication({ caseId, isAdmin, messages: initialMessages, onMessageSent }: CaseCommunicationProps) {
+export function InternalNotesPanel({ caseId }: InternalNotesPanelProps) {
+  const [notes, setNotes] = useState<InternalNoteResponse[]>([]);
+  const [loading, setLoading] = useState(false);
   const [draft, setDraft] = useState('');
-  const [showRequestForm, setShowRequestForm] = useState(false);
-  const [messages, setMessages] = useState<Message[]>(initialMessages ?? getMessages(caseId));
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [currentUsername, setCurrentUsername] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!initialMessages) setMessages(getMessages(caseId));
-  }, [caseId]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    markMessagesRead(caseId, isAdmin ? 'REPORTER' : 'INVESTIGATION_TEAM');
-  }, [messages.length, caseId, isAdmin]);
-
-  const handleSend = (content: string, type: MessageType = 'MESSAGE', deadline?: string) => {
-    if (!content.trim()) return;
-    const msg = svcSend(caseId, content, isAdmin ? 'INVESTIGATION_TEAM' : 'REPORTER', type, deadline);
-    setMessages(prev => [...prev, msg]);
-    onMessageSent?.(msg);
-    setDraft('');
-    toast.success('Message sent');
+  const fetchNotes = async () => {
+    setLoading(true);
+    try {
+      const res = await getInternalNotes(caseId);
+      setNotes(res);
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 403 || err.status === 404)) {
+        setNotes([]);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const unreadCount = messages.filter(m =>
-    isAdmin ? (m.senderType === 'REPORTER' && !m.readAt) : (m.senderType === 'INVESTIGATION_TEAM' && !m.readAt)
-  ).length;
+  useEffect(() => {
+    fetchNotes();
+    getCurrentUser()
+      .then((user) => setCurrentUsername(user.username))
+      .catch(() => {});
+  }, [caseId]);
+
+  const handleCreate = async () => {
+    if (!draft.trim()) return;
+    setSaving(true);
+    try {
+      const note = await createInternalNote(caseId, draft.trim());
+      setNotes((prev) => [note, ...prev]);
+      setDraft('');
+      toast.success('Internal note saved to case');
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : 'Failed to save note.';
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleStartEdit = (note: InternalNoteResponse) => {
+    setEditingId(note.id);
+    setEditContent(note.content);
+  };
+
+  const handleSaveEdit = async (noteId: number) => {
+    if (!editContent.trim()) return;
+    try {
+      const updated = await updateInternalNote(caseId, noteId, editContent.trim());
+      setNotes((prev) => prev.map((n) => (n.id === noteId ? updated : n)));
+      setEditingId(null);
+      setEditContent('');
+      toast.success('Internal note updated');
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : 'Failed to update note.';
+      toast.error(msg);
+    }
+  };
+
+  const handleDelete = async (noteId: number) => {
+    if (!confirm('Are you sure you want to delete this internal note?')) return;
+    try {
+      await deleteInternalNote(caseId, noteId);
+      setNotes((prev) => prev.filter((n) => n.id !== noteId));
+      toast.success('Internal note deleted');
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : 'Failed to delete note.';
+      toast.error(msg);
+    }
+  };
 
   return (
-    <div className="flex flex-col h-full" style={{ background: C.bg }}>
+    <div className="flex flex-col border" style={{ background: C.bg, borderColor: C.border }}>
       {/* Header */}
-      <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: C.border }}>
+      <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: C.border, background: C.surface }}>
         <div className="flex items-center gap-3">
-          <MessageSquare size={15} style={{ color: C.cyan }} />
+          <FileText size={16} style={{ color: C.rose }} />
           <div>
-            <div className="font-mono text-xs uppercase tracking-widest" style={{ color: C.text }}>Communication</div>
+            <div className="font-mono text-xs uppercase tracking-widest font-bold" style={{ color: C.text }}>
+              Internal Notes
+            </div>
             <div className="font-mono text-[10px]" style={{ color: C.textDim }}>
-              Anonymous Reporter ↔ Investigation Team
+              Visible only to authorized institutional staff. Never exposed to public feeds or tracking.
             </div>
           </div>
-          {unreadCount > 0 && (
-            <span className="font-mono text-[9px] px-2 py-0.5" style={{ background: `${C.cyan}20`, color: C.cyan }}>
-              {unreadCount} unread
-            </span>
-          )}
         </div>
-        <div className="flex items-center gap-2">
-          <Lock size={11} style={{ color: C.emerald }} />
-          <span className="font-mono text-[10px]" style={{ color: C.textDim }}>End-to-end private</span>
-        </div>
-      </div>
-
-      {/* Privacy notice */}
-      <div className="px-6 py-2.5 border-b flex items-center gap-3" style={{ borderColor: C.border, background: `${C.emerald}04` }}>
-        <Shield size={11} style={{ color: C.emerald }} />
-        <span className="font-mono text-[10px]" style={{ color: C.textDim }}>
-          Neither party's identity is revealed. Messages are linked to case {caseId} only.
+        <span
+          className="font-mono text-[9px] uppercase tracking-widest px-2.5 py-1 border"
+          style={{ borderColor: `${C.rose}40`, color: C.rose, background: `${C.rose}10` }}
+        >
+          Staff Confidential
         </span>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-auto px-6 py-4">
-        {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 gap-3">
-            <MessageSquare size={28} style={{ color: C.border2 }} />
-            <p className="font-mono text-xs uppercase tracking-widest" style={{ color: C.textDim }}>
-              No messages yet — begin communication below
-            </p>
-          </div>
-        ) : (
-          messages.map(msg => <MessageBubble key={msg.id} msg={msg} isAdmin={isAdmin} />)
-        )}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Info request form */}
-      {showRequestForm && isAdmin && (
-        <div className="px-6 pb-3">
-          <InfoRequestForm
-            onSend={(content, type, deadline) => { handleSend(content, type, deadline); setShowRequestForm(false); }}
-            onClose={() => setShowRequestForm(false)}
-          />
-        </div>
-      )}
-
-      {/* Compose */}
-      <div className="px-6 py-4 border-t" style={{ borderColor: C.border }}>
-        <div className="flex gap-2 mb-2">
-          <div className="relative flex-1">
-            <textarea
-              value={draft}
-              onChange={e => setDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(draft); } }}
-              rows={2}
-              placeholder={isAdmin ? 'Write a message to the anonymous reporter...' : 'Reply to the investigation team...'}
-              className="w-full px-4 py-3 font-mono text-xs border bg-transparent outline-none resize-none leading-relaxed"
-              style={{ borderColor: C.border, color: C.text }}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={() => handleSend(draft)}
-              disabled={!draft.trim()}
-              className="flex items-center justify-center gap-1.5 px-4 py-2 font-mono text-[10px] uppercase tracking-widest disabled:opacity-40 transition-opacity"
-              style={{ background: C.cyan, color: C.bg }}
-            >
-              <Send size={11} /> Send
-            </button>
-            <button
-              className="flex items-center justify-center gap-1 px-3 py-2 border font-mono text-[10px] uppercase tracking-widest"
-              style={{ borderColor: C.border, color: C.textDim }}
-            >
-              <Paperclip size={11} /> Attach
-            </button>
-          </div>
-        </div>
-        {isAdmin && !showRequestForm && (
-          <button
-            onClick={() => setShowRequestForm(true)}
-            className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest"
-            style={{ color: C.amber }}
-          >
-            <Plus size={11} /> Request Information / Evidence
-          </button>
-        )}
-        <div className="font-mono text-[9px] mt-1" style={{ color: C.textDim }}>
-          Press Enter to send · Shift+Enter for new line
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Internal Notes Panel ─────────────────────────────────────────────────────
-
-interface InternalNotesPanelProps {
-  caseId: string;
-  notes?: InternalNote[];
-  onNoteAdded?: (note: InternalNote) => void;
-}
-
-export function InternalNotesPanel({ caseId, notes: initialNotes, onNoteAdded }: InternalNotesPanelProps) {
-  const [draft, setDraft] = useState('');
-  const [notes, setNotes] = useState<InternalNote[]>(initialNotes ?? getInternalNotes(caseId));
-  const AUTHOR_ID = 'a.chen@northfield.edu';
-  const AUTHOR_NAME = 'A. Chen';
-
-  const handleAdd = () => {
-    if (!draft.trim()) return;
-    const note = svcAddNote(caseId, draft, AUTHOR_ID, AUTHOR_NAME);
-    setNotes(prev => [...prev, note]);
-    onNoteAdded?.(note);
-    setDraft('');
-    toast.success('Internal note saved');
-  };
-
-  return (
-    <div className="flex flex-col h-full" style={{ background: C.bg }}>
-      {/* Header */}
-      <div className="px-6 py-4 border-b" style={{ borderColor: C.border }}>
-        <div className="flex items-center gap-3 mb-1">
-          <Lock size={13} style={{ color: C.rose }} />
-          <div className="font-mono text-xs uppercase tracking-widest" style={{ color: C.text }}>Internal Notes</div>
-          <span className="font-mono text-[9px] px-2 py-0.5 border" style={{ borderColor: `${C.rose}28`, color: C.rose, background: `${C.rose}08` }}>
-            INVESTIGATORS ONLY
-          </span>
-        </div>
-        <p className="font-mono text-[10px]" style={{ color: C.textDim }}>
-          Internal notes are never visible to the anonymous reporter.
-        </p>
-      </div>
-
-      {/* Notes list */}
-      <div className="flex-1 overflow-auto px-6 py-4 space-y-4">
-        {notes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 gap-3">
-            <FileText size={28} style={{ color: C.border2 }} />
-            <p className="font-mono text-xs uppercase tracking-widest" style={{ color: C.textDim }}>No internal notes yet</p>
-          </div>
-        ) : (
-          notes.map(note => (
-            <div key={note.id} className="border-l-2 pl-4" style={{ borderColor: C.border2 }}>
-              <div className="flex items-baseline gap-2 mb-1.5">
-                <span className="font-mono text-[10px] font-bold" style={{ color: C.text }}>{note.authorName}</span>
-                <span className="font-mono text-[9px]" style={{ color: C.textDim }}>
-                  {format(new Date(note.createdAt), 'dd MMM, HH:mm')}
-                </span>
-                {note.updatedAt && (
-                  <span className="font-mono text-[9px]" style={{ color: C.textDim }}>(edited)</span>
-                )}
-              </div>
-              <p className="font-mono text-xs leading-relaxed" style={{ color: C.textSub }}>
-                {note.content.split(/(@\w+@[\w.]+)/).map((part, i) =>
-                  part.startsWith('@') ? (
-                    <span key={i} style={{ color: C.cyan }}>{part}</span>
-                  ) : part
-                )}
-              </p>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Add note */}
-      <div className="px-6 py-4 border-t" style={{ borderColor: C.border }}>
-        <div className="font-mono text-[10px] uppercase tracking-widest mb-2" style={{ color: C.textDim }}>
-          Add Internal Note
-        </div>
+      {/* Add Note Section */}
+      <div className="p-6 border-b" style={{ borderColor: C.border, background: C.surface }}>
+        <label className="block font-mono text-[10px] uppercase tracking-widest mb-2" style={{ color: C.textSub }}>
+          Add Formal Investigation Note
+        </label>
         <textarea
           value={draft}
-          onChange={e => setDraft(e.target.value)}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Record private investigation findings, evidence observations, or internal reasoning…"
           rows={3}
-          placeholder="Add an internal note visible only to investigators. Use @email to mention colleagues."
-          className="w-full px-4 py-3 font-mono text-xs border bg-transparent outline-none resize-none leading-relaxed"
+          disabled={saving}
+          className="w-full p-3 font-mono text-xs border bg-transparent outline-none resize-none leading-relaxed"
           style={{ borderColor: C.border, color: C.text }}
-          onFocus={e => { e.target.style.borderColor = C.rose; }}
-          onBlur={e => { e.target.style.borderColor = C.border; }}
         />
-        <div className="flex justify-between items-center mt-2">
-          <span className="font-mono text-[9px]" style={{ color: C.textDim }}>Posting as {AUTHOR_NAME}</span>
+        <div className="flex items-center justify-between mt-2">
+          <span className="font-mono text-[10px]" style={{ color: C.textDim }}>
+            {currentUsername ? `Author: ${currentUsername}` : 'Authenticated Staff'}
+          </span>
           <button
-            onClick={handleAdd}
-            disabled={!draft.trim()}
-            className="flex items-center gap-2 px-4 py-1.5 font-mono text-xs uppercase tracking-widest disabled:opacity-40"
-            style={{ background: C.surface3, border: `1px solid ${C.border2}`, color: C.textSub }}
+            onClick={handleCreate}
+            disabled={saving || !draft.trim()}
+            className="px-4 py-1.5 font-mono text-xs uppercase tracking-widest font-bold flex items-center gap-1.5 disabled:opacity-40"
+            style={{ background: C.rose, color: C.text }}
           >
-            <Plus size={11} /> Add Note
+            {saving ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+            <span>Save Note</span>
           </button>
         </div>
+      </div>
+
+      {/* Notes List */}
+      <div className="p-6 space-y-4 max-h-96 overflow-y-auto" style={{ background: C.surface2 }}>
+        {loading ? (
+          <div className="text-center py-8 font-mono text-xs" style={{ color: C.textDim }}>
+            <Loader2 size={16} className="animate-spin mx-auto mb-2" />
+            Loading internal notes…
+          </div>
+        ) : notes.length === 0 ? (
+          <div className="text-center py-8 font-mono text-xs space-y-1" style={{ color: C.textDim }}>
+            <FileText size={24} className="mx-auto mb-2 opacity-30" />
+            <p>No internal notes recorded for this case.</p>
+          </div>
+        ) : (
+          notes.map((note) => {
+            const isAuthor = currentUsername === note.authorUsername;
+            return (
+              <div
+                key={note.id}
+                className="p-4 border relative space-y-2"
+                style={{ borderColor: C.border, background: C.surface }}
+              >
+                <div className="flex items-center justify-between font-mono text-[10px] border-b pb-2" style={{ borderColor: C.border }}>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold" style={{ color: C.cyan }}>
+                      {note.authorUsername}
+                    </span>
+                    <span style={{ color: C.textDim }}>
+                      {format(new Date(note.createdAt), 'dd MMM yyyy, HH:mm')}
+                    </span>
+                    {note.updatedAt && note.updatedAt !== note.createdAt && (
+                      <span className="text-[9px] italic" style={{ color: C.textDim }}>
+                        (edited)
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isAuthor && editingId !== note.id && (
+                      <button
+                        onClick={() => handleStartEdit(note)}
+                        className="hover:opacity-100 opacity-60 p-1"
+                        title="Edit note"
+                      >
+                        <Edit2 size={12} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDelete(note.id)}
+                      className="hover:text-rose-400 opacity-60 p-1"
+                      title="Delete note"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+
+                {editingId === note.id ? (
+                  <div className="space-y-2 pt-2">
+                    <textarea
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      rows={3}
+                      className="w-full p-2.5 font-mono text-xs border bg-transparent outline-none"
+                      style={{ borderColor: C.cyan, color: C.text }}
+                    />
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="px-3 py-1 font-mono text-[10px] uppercase tracking-wider border"
+                        style={{ borderColor: C.border, color: C.textDim }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleSaveEdit(note.id)}
+                        className="px-3 py-1 font-mono text-[10px] uppercase tracking-wider font-bold"
+                        style={{ background: C.cyan, color: C.bg }}
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="font-mono text-xs leading-relaxed" style={{ color: C.textSub }}>
+                    {note.content}
+                  </p>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

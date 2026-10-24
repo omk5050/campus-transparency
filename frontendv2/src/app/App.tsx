@@ -88,6 +88,8 @@ import {
   transitionStatus,
   voteIssue,
   hideIssue,
+  getCurrentUser,
+  UserProfileResponse,
   ApiError,
 } from "./api";
 import { mapIssuePage } from "./mapper";
@@ -112,6 +114,10 @@ import { CaseAssignment } from "./components/CaseAssignment";
 import { ResolutionForm, ResolutionDisplay } from "./components/ResolutionFlow";
 import { EvidenceWorkspace } from "./components/EvidenceWorkspace";
 import { AIOverridePanel } from "./components/AIOverridePanel";
+import { OrganizationApplicationApply } from "./components/OrganizationApplicationApply";
+import { SuperAdminApplications } from "./components/SuperAdminApplications";
+import { JoinCodeRegistration } from "./components/JoinCodeRegistration";
+import { JoinCodeManagement } from "./components/JoinCodeManagement";
 
 // ─── Design constants ──────────────────────────────────────────────────────────
 const C = {
@@ -975,7 +981,9 @@ type OrgView =
   | "NOTIFICATIONS"
   | "TRACK"
   | "MODERATION"
-  | "PLATFORM";
+  | "PLATFORM"
+  | "JOIN_CODES"
+  | "ORG_APPLICATIONS";
 
 const NAV_MAIN: {
   id: OrgView;
@@ -1019,6 +1027,7 @@ function OrgSidebar({
   unresolvedCount,
   unreadNotifications,
   onSearch,
+  isSuperAdmin,
 }: {
   org: Organization;
   allOrgs: Organization[];
@@ -1029,9 +1038,10 @@ function OrgSidebar({
   unresolvedCount: number;
   unreadNotifications: number;
   onSearch: () => void;
+  isSuperAdmin?: boolean;
 }) {
   const [orgOpen, setOrgOpen] = useState(false);
-  const isAdmin = org.role === "ADMIN" || org.role === "OWNER";
+  const isAdmin = isSuperAdmin || org.role === "ADMIN" || org.role === "OWNER";
 
   return (
     <aside
@@ -1278,6 +1288,20 @@ function OrgSidebar({
               </span>
             </button>
             <button
+              onClick={() => onView("JOIN_CODES")}
+              className="w-full flex items-center gap-3 px-5 py-2.5 transition-colors text-left relative"
+              style={{
+                color: view === "JOIN_CODES" ? C.cyan : C.textSub,
+                background: view === "JOIN_CODES" ? `${C.cyan}08` : "transparent",
+              }}
+            >
+              {view === "JOIN_CODES" && (
+                <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ background: C.cyan }} />
+              )}
+              <Hash size={15} />
+              <span className="font-mono text-xs">Join Codes</span>
+            </button>
+            <button
               onClick={() => onView("MODERATION")}
               className="w-full flex items-center gap-3 px-5 py-2.5 transition-colors text-left relative"
               style={{
@@ -1291,21 +1315,37 @@ function OrgSidebar({
               <Flag size={15} />
               <span className="font-mono text-xs">Moderation</span>
             </button>
-            {org.role === "OWNER" && (
-              <button
-                onClick={() => onView("PLATFORM")}
-                className="w-full flex items-center gap-3 px-5 py-2.5 transition-colors text-left relative"
-                style={{
-                  color: view === "PLATFORM" ? C.rose : C.textSub,
-                  background: view === "PLATFORM" ? `${C.rose}08` : "transparent",
-                }}
-              >
-                {view === "PLATFORM" && (
-                  <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ background: C.rose }} />
-                )}
-                <Terminal size={15} />
-                <span className="font-mono text-xs">Platform Admin</span>
-              </button>
+            {(isSuperAdmin || org.role === "OWNER") && (
+              <>
+                <button
+                  onClick={() => onView("ORG_APPLICATIONS")}
+                  className="w-full flex items-center gap-3 px-5 py-2.5 transition-colors text-left relative"
+                  style={{
+                    color: view === "ORG_APPLICATIONS" ? C.rose : C.textSub,
+                    background: view === "ORG_APPLICATIONS" ? `${C.rose}08` : "transparent",
+                  }}
+                >
+                  {view === "ORG_APPLICATIONS" && (
+                    <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ background: C.rose }} />
+                  )}
+                  <Building2 size={15} />
+                  <span className="font-mono text-xs">Org Applications</span>
+                </button>
+                <button
+                  onClick={() => onView("PLATFORM")}
+                  className="w-full flex items-center gap-3 px-5 py-2.5 transition-colors text-left relative"
+                  style={{
+                    color: view === "PLATFORM" ? C.rose : C.textSub,
+                    background: view === "PLATFORM" ? `${C.rose}08` : "transparent",
+                  }}
+                >
+                  {view === "PLATFORM" && (
+                    <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ background: C.rose }} />
+                  )}
+                  <Terminal size={15} />
+                  <span className="font-mono text-xs">Platform Admin</span>
+                </button>
+              </>
             )}
           </>
         )}
@@ -4843,74 +4883,9 @@ function OrgSettingsView({ org }: { org: Organization }) {
           )}
 
           {tab === "invites" && (
-            <>
-              <div
-                className="font-serif text-lg mb-4"
-                style={{ color: C.text }}
-              >
-                Invite Codes
-              </div>
-              <div
-                className="border mb-4"
-                style={{ borderColor: C.border }}
-              >
-                {mockCodes.map((c) => (
-                  <div
-                    key={c.code}
-                    className="flex items-center gap-4 px-5 py-4 border-b last:border-b-0"
-                    style={{ borderColor: C.border }}
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="font-mono text-base font-bold"
-                          style={{ color: C.cyan }}
-                        >
-                          {c.code}
-                        </span>
-                        <CopyBtn text={c.code} label="code" />
-                      </div>
-                      <div
-                        className="font-mono text-[10px] mt-0.5"
-                        style={{ color: C.textDim }}
-                      >
-                        {c.uses}/{c.maxUses} uses · Expires{" "}
-                        {formatDistanceToNow(c.expires, {
-                          addSuffix: true,
-                        })}
-                      </div>
-                    </div>
-                    <div
-                      className="h-1 w-20"
-                      style={{ background: C.border }}
-                    >
-                      <div
-                        className="h-full"
-                        style={{
-                          width: `${(c.uses / c.maxUses) * 100}%`,
-                          background: C.cyan,
-                        }}
-                      />
-                    </div>
-                    <button
-                      className="font-mono text-[10px] uppercase tracking-widest transition-opacity hover:opacity-70"
-                      style={{ color: C.rose }}
-                    >
-                      Revoke
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <button
-                className="flex items-center gap-2 px-4 py-2 border font-mono text-xs uppercase tracking-widest"
-                style={{
-                  borderColor: C.border,
-                  color: C.textSub,
-                }}
-              >
-                <Plus size={13} /> Generate New Code
-              </button>
-            </>
+            <div className="py-2">
+              <JoinCodeManagement isAdmin={true} />
+            </div>
           )}
 
           {tab === "workflow" && (
@@ -4935,10 +4910,38 @@ function OrgSettingsView({ org }: { org: Organization }) {
 }
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
-type AppState = "LOGIN" | "SPACES" | "JOIN" | "ORG";
+type AppState = "LOGIN" | "REGISTER" | "APPLY" | "SPACES" | "JOIN" | "ORG";
+
+function parseInitialRoute(): { appState: AppState; orgView?: OrgView } {
+  const path = window.location.pathname;
+  if (path === '/organization/apply' || path === '/apply') {
+    return { appState: 'APPLY' };
+  }
+  if (path === '/register') {
+    return { appState: 'REGISTER' };
+  }
+  if (path === '/admin/organization-applications') {
+    return { appState: isAuthenticated() ? 'ORG' : 'LOGIN', orgView: 'ORG_APPLICATIONS' };
+  }
+  if (path === '/admin/join-codes') {
+    return { appState: isAuthenticated() ? 'ORG' : 'LOGIN', orgView: 'JOIN_CODES' };
+  }
+  if (path === '/track') {
+    return { appState: isAuthenticated() ? 'ORG' : 'LOGIN', orgView: 'TRACK' };
+  }
+  return { appState: isAuthenticated() ? 'SPACES' : 'LOGIN' };
+}
 
 // ─── Login View ────────────────────────────────────────────────────────────────
-function LoginView({ onSuccess }: { onSuccess: () => void }) {
+function LoginView({
+  onSuccess,
+  onRegisterClick,
+  onApplyClick,
+}: {
+  onSuccess: () => void;
+  onRegisterClick: () => void;
+  onApplyClick: () => void;
+}) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -4972,7 +4975,7 @@ function LoginView({ onSuccess }: { onSuccess: () => void }) {
       style={{ background: C.bg }}
     >
       <div
-        className="w-full max-w-sm border p-8"
+        className="w-full max-w-sm border p-8 shadow-2xl"
         style={{ background: C.surface, borderColor: C.border2 }}
       >
         {/* Header */}
@@ -4995,7 +4998,7 @@ function LoginView({ onSuccess }: { onSuccess: () => void }) {
             Sign in
           </h1>
           <p className="font-mono text-xs" style={{ color: C.textSub }}>
-            Campus Transparency Platform
+            Ethical Governance & Campus Transparency
           </p>
         </div>
 
@@ -5066,21 +5069,92 @@ function LoginView({ onSuccess }: { onSuccess: () => void }) {
           </button>
         </form>
 
-        <p className="mt-6 font-mono text-[10px] text-center" style={{ color: C.textDim }}>
+        <p className="mt-4 font-mono text-[10px] text-center" style={{ color: C.textDim }}>
           Default credentials: admin / admin123 · student / student123
         </p>
+
+        {/* Phase 2.7 Registration and Institutional Application Links */}
+        <div className="mt-6 pt-5 border-t space-y-2.5 font-mono text-xs" style={{ borderColor: C.border }}>
+          <button
+            type="button"
+            onClick={onRegisterClick}
+            className="w-full text-left py-2 px-3 border transition-colors hover:bg-white/[0.03] flex items-center justify-between"
+            style={{ borderColor: C.border, color: C.cyan }}
+          >
+            <span>Have an organization join code?</span>
+            <span className="text-[10px] uppercase font-bold tracking-wider">Register →</span>
+          </button>
+          <button
+            type="button"
+            onClick={onApplyClick}
+            className="w-full text-left py-2 px-3 border transition-colors hover:bg-white/[0.03] flex items-center justify-between"
+            style={{ borderColor: C.border, color: C.textSub }}
+          >
+            <span>Register a new institution?</span>
+            <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400">Apply →</span>
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
 export default function App() {
-  // ── Determine initial state: go to LOGIN if no token stored ──────────────────
-  const [appState, setAppState] = useState<AppState>(() =>
-    isAuthenticated() ? "SPACES" : "LOGIN",
-  );
+  const initialRoute = parseInitialRoute();
+  const [appState, setAppState] = useState<AppState>(initialRoute.appState);
   const [currentOrg, setCurrentOrg] = useState<Organization | null>(null);
-  const [orgView, setOrgView] = useState<OrgView>("OVERVIEW");
+  const [orgView, setOrgView] = useState<OrgView>(initialRoute.orgView ?? "OVERVIEW");
+  const [userProfile, setUserProfile] = useState<UserProfileResponse | null>(null);
+
+  const navigateTo = (path: string, state: AppState, view?: OrgView) => {
+    window.history.pushState({}, '', path);
+    setAppState(state);
+    if (view) setOrgView(view);
+  };
+
+  useEffect(() => {
+    const onPopState = () => {
+      const route = parseInitialRoute();
+      setAppState(route.appState);
+      if (route.orgView) setOrgView(route.orgView);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  const loadUserProfile = async () => {
+    if (!isAuthenticated()) return;
+    try {
+      const profile = await getCurrentUser();
+      setUserProfile(profile);
+      if (profile.organization && !currentOrg) {
+        setCurrentOrg({
+          id: String(profile.organization.id),
+          name: profile.organization.name,
+          shortName: profile.organization.name.split(' ')[0] || profile.organization.name,
+          domain: profile.organization.name.toLowerCase().replace(/[^a-z0-9]/g, '') + '.edu',
+          type: (profile.organization.type as any) || 'UNIVERSITY',
+          memberCount: 1,
+          reportCount: 0,
+          unresolvedCount: 0,
+          pendingCount: 0,
+          role: profile.role === 'SUPER_ADMIN' ? 'OWNER' : profile.role === 'ADMIN' ? 'ADMIN' : 'MEMBER',
+          logoChar: profile.organization.name[0] || 'E',
+          accentColor: '#00C8E8',
+          joinedAt: new Date().toISOString(),
+          verificationStatus: 'VERIFIED',
+        });
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated()) {
+      loadUserProfile();
+    }
+  }, [appState]);
 
   // reports starts empty — populated from backend after auth
   const [reports, setReports] = useState<Report[]>([]);
@@ -5092,11 +5166,12 @@ export default function App() {
   const [showSearch, setShowSearch] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>(_notifications);
 
-  // isAdmin is inferred from current org's mock role.
-  // The backend enforces the real role on every API call.
-  const isAdmin = currentOrg
-    ? currentOrg.role === "ADMIN" || currentOrg.role === "OWNER"
-    : false;
+  // Authoritative role evaluation
+  const isSuperAdmin = userProfile?.role === "SUPER_ADMIN";
+  const isAdmin =
+    isSuperAdmin ||
+    userProfile?.role === "ADMIN" ||
+    (currentOrg ? currentOrg.role === "ADMIN" || currentOrg.role === "OWNER" : false);
 
   const selectedReport = useMemo(
     () => reports.find((r) => r.id === selectedReportId) ?? null,
@@ -5153,15 +5228,17 @@ export default function App() {
   }, [appState]);
 
   // ── Auth handlers ─────────────────────────────────────────────────────────────
-  const handleLoginSuccess = () => {
-    setAppState("SPACES");
+  const handleLoginSuccess = async () => {
+    await loadUserProfile();
+    navigateTo("/", "SPACES");
   };
 
   const handleLogout = () => {
     apiLogout();
     setReports([]);
     setCurrentOrg(null);
-    setAppState("LOGIN");
+    setUserProfile(null);
+    navigateTo("/login", "LOGIN");
   };
 
   // ── Navigation handlers ───────────────────────────────────────────────────────
@@ -5344,7 +5421,27 @@ export default function App() {
       />
 
       {appState === "LOGIN" && (
-        <LoginView onSuccess={handleLoginSuccess} />
+        <LoginView
+          onSuccess={handleLoginSuccess}
+          onRegisterClick={() => navigateTo("/register", "REGISTER")}
+          onApplyClick={() => navigateTo("/organization/apply", "APPLY")}
+        />
+      )}
+
+      {appState === "REGISTER" && (
+        <JoinCodeRegistration
+          onSuccess={() => {
+            toast.success("Registration successful! Please sign in with your new credentials.");
+            navigateTo("/login", "LOGIN");
+          }}
+          onBackToLogin={() => navigateTo("/login", "LOGIN")}
+        />
+      )}
+
+      {appState === "APPLY" && (
+        <OrganizationApplicationApply
+          onBackToLogin={() => navigateTo("/login", "LOGIN")}
+        />
       )}
 
       {appState === "SPACES" && (
@@ -5382,6 +5479,7 @@ export default function App() {
             org={currentOrg}
             allOrgs={_orgs}
             view={orgView}
+            isSuperAdmin={isSuperAdmin}
             onView={(v) => {
               setOrgView(v);
               if (v !== "DETAIL") setSelectedReportId(null);
@@ -5478,6 +5576,18 @@ export default function App() {
             )}
             {orgView === "PLATFORM" && (
               <PlatformAdminView />
+            )}
+            {orgView === "JOIN_CODES" && (
+              <JoinCodeManagement
+                isAdmin={isAdmin}
+                onNavigateHome={() => setOrgView("OVERVIEW")}
+              />
+            )}
+            {orgView === "ORG_APPLICATIONS" && (
+              <SuperAdminApplications
+                isSuperAdmin={isSuperAdmin}
+                onNavigateHome={() => setOrgView("OVERVIEW")}
+              />
             )}
           </main>
 

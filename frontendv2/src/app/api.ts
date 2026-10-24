@@ -431,5 +431,327 @@ export async function transitionStatus(
   }
 }
 
+// ─── Organization Applications ────────────────────────────────────────────────
+
+export type OrganizationType =
+  | 'COLLEGE'
+  | 'UNIVERSITY'
+  | 'NGO'
+  | 'SCHOOL'
+  | 'CORPORATE'
+  | 'OTHER';
+
+export type ApplicationStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface CreateOrganizationApplicationRequest {
+  organizationName: string;
+  organizationType: OrganizationType;
+  officialEmail: string;
+  contactPerson: string;
+  address: string;
+  website?: string;
+  description: string;
+  requestedAdminEmail: string;
+  requestedAdminUsername: string;
+  requestedAdminPassword: string;
+}
+
+export interface OrganizationApplicationResponse {
+  id: number;
+  organizationName: string;
+  organizationType: OrganizationType;
+  officialEmail: string;
+  contactPerson: string;
+  address: string;
+  website?: string;
+  description: string;
+  requestedAdminEmail: string;
+  requestedAdminUsername: string;
+  status: ApplicationStatus;
+  rejectionReason?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  approvedOrganizationId?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** POST /api/organization-applications — Public application submission */
+export async function submitOrganizationApplication(
+  req: CreateOrganizationApplicationRequest,
+): Promise<OrganizationApplicationResponse> {
+  return request<OrganizationApplicationResponse>('/organization-applications', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  });
+}
+
+/** GET /api/admin/organization-applications — Super Admin listing */
+export async function getOrganizationApplications(
+  status?: ApplicationStatus,
+  page = 0,
+  size = 50,
+): Promise<SpringPage<OrganizationApplicationResponse>> {
+  const query = buildQuery({ status, page, size, sort: 'createdAt,desc' });
+  return request<SpringPage<OrganizationApplicationResponse>>(
+    `/admin/organization-applications${query}`,
+  );
+}
+
+/** GET /api/admin/organization-applications/{id} — Super Admin detail */
+export async function getOrganizationApplication(
+  id: number | string,
+): Promise<OrganizationApplicationResponse> {
+  return request<OrganizationApplicationResponse>(
+    `/admin/organization-applications/${id}`,
+  );
+}
+
+/** POST /api/admin/organization-applications/{id}/approve — Super Admin approve */
+export async function approveOrganizationApplication(
+  id: number | string,
+): Promise<OrganizationApplicationResponse> {
+  return request<OrganizationApplicationResponse>(
+    `/admin/organization-applications/${id}/approve`,
+    { method: 'POST' },
+  );
+}
+
+/** POST /api/admin/organization-applications/{id}/reject — Super Admin reject */
+export async function rejectOrganizationApplication(
+  id: number | string,
+  reason: string,
+): Promise<OrganizationApplicationResponse> {
+  return request<OrganizationApplicationResponse>(
+    `/admin/organization-applications/${id}/reject`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    },
+  );
+}
+
+// ─── Organization Join Codes ──────────────────────────────────────────────────
+
+export type TargetRole = 'STUDENT' | 'ADMIN';
+
+export interface CreateJoinCodeRequest {
+  targetRole: TargetRole;
+  maxUses?: number;
+  expiresInDays?: number;
+  customPrefix?: string;
+}
+
+export interface JoinCodeResponse {
+  id: number;
+  code: string;
+  organizationId: number;
+  organizationName: string;
+  targetRole: TargetRole;
+  createdBy: string;
+  maxUses: number;
+  usedCount: number;
+  expiresAt: string;
+  revoked: boolean;
+  revokedAt?: string;
+  revokedBy?: string;
+  valid: boolean;
+  createdAt: string;
+}
+
+export interface ValidateJoinCodeResponse {
+  valid: boolean;
+  code: string;
+  organizationId: number;
+  organizationName: string;
+  organizationType: string;
+  targetRole: TargetRole;
+  expiresAt: string;
+  message?: string;
+}
+
+export interface RegisterRequest {
+  username: string;
+  password: string;
+  joinCode: string;
+}
+
+export interface UserProfileResponse {
+  id: number;
+  username: string;
+  role: 'STUDENT' | 'ADMIN' | 'SUPER_ADMIN';
+  organization?: {
+    id: number;
+    name: string;
+    type: string;
+  } | null;
+}
+
+/** POST /api/admin/join-codes — Create new join code for admin's organization */
+export async function createJoinCode(
+  req: CreateJoinCodeRequest,
+): Promise<JoinCodeResponse> {
+  return request<JoinCodeResponse>('/admin/join-codes', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  });
+}
+
+/** GET /api/admin/join-codes — List join codes for admin's organization */
+export async function getJoinCodes(params: {
+  organizationId?: number;
+  page?: number;
+  size?: number;
+} = {}): Promise<SpringPage<JoinCodeResponse>> {
+  const { organizationId, page = 0, size = 50 } = params;
+  const query = buildQuery({ organizationId, page, size, sort: 'createdAt,desc' });
+  return request<SpringPage<JoinCodeResponse>>(`/admin/join-codes${query}`);
+}
+
+/** POST /api/admin/join-codes/{id}/revoke — Revoke join code */
+export async function revokeJoinCode(
+  id: number | string,
+): Promise<JoinCodeResponse> {
+  return request<JoinCodeResponse>(`/admin/join-codes/${id}/revoke`, {
+    method: 'POST',
+  });
+}
+
+/** GET /api/auth/join-codes/{code}/validate — Public join code validation */
+export async function validateJoinCode(
+  code: string,
+): Promise<ValidateJoinCodeResponse> {
+  return request<ValidateJoinCodeResponse>(
+    `/auth/join-codes/${encodeURIComponent(code)}/validate`,
+  );
+}
+
+/** POST /api/auth/register — Public user registration with join code */
+export async function registerWithJoinCode(
+  req: RegisterRequest,
+): Promise<string> {
+  const data = await request<{ token: string }>('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  });
+  setToken(data.token);
+  return data.token;
+}
+
+/** GET /api/auth/me — Retrieve authenticated user profile and tenant binding */
+export async function getCurrentUser(): Promise<UserProfileResponse> {
+  return request<UserProfileResponse>('/auth/me');
+}
+
+// ─── Internal Notes ───────────────────────────────────────────────────────────
+
+export interface InternalNoteResponse {
+  id: number;
+  issueId: number;
+  authorId: number;
+  authorUsername: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** GET /api/issues/{issueId}/internal-notes — List internal notes */
+export async function getInternalNotes(
+  issueId: number | string,
+): Promise<InternalNoteResponse[]> {
+  return request<InternalNoteResponse[]>(`/issues/${issueId}/internal-notes`);
+}
+
+/** POST /api/issues/{issueId}/internal-notes — Create internal note */
+export async function createInternalNote(
+  issueId: number | string,
+  content: string,
+): Promise<InternalNoteResponse> {
+  return request<InternalNoteResponse>(`/issues/${issueId}/internal-notes`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  });
+}
+
+/** PUT /api/issues/{issueId}/internal-notes/{noteId} — Update internal note */
+export async function updateInternalNote(
+  issueId: number | string,
+  noteId: number | string,
+  content: string,
+): Promise<InternalNoteResponse> {
+  return request<InternalNoteResponse>(
+    `/issues/${issueId}/internal-notes/${noteId}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
+    },
+  );
+}
+
+/** DELETE /api/issues/{issueId}/internal-notes/{noteId} — Delete internal note */
+export async function deleteInternalNote(
+  issueId: number | string,
+  noteId: number | string,
+): Promise<void> {
+  return request<void>(`/issues/${issueId}/internal-notes/${noteId}`, {
+    method: 'DELETE',
+  });
+}
+
+// ─── Investigator Messaging ───────────────────────────────────────────────────
+
+export interface IssueMessageResponse {
+  id: number;
+  issueId: number;
+  senderId: number;
+  senderUsername: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** GET /api/issues/{issueId}/messages — List investigator messages */
+export async function getIssueMessages(
+  issueId: number | string,
+): Promise<IssueMessageResponse[]> {
+  return request<IssueMessageResponse[]>(`/issues/${issueId}/messages`);
+}
+
+/** POST /api/issues/{issueId}/messages — Send investigator message */
+export async function sendIssueMessage(
+  issueId: number | string,
+  content: string,
+): Promise<IssueMessageResponse> {
+  return request<IssueMessageResponse>(`/issues/${issueId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  });
+}
+
+/** PUT /api/issues/{issueId}/messages/{messageId} — Update investigator message */
+export async function updateIssueMessage(
+  issueId: number | string,
+  messageId: number | string,
+  content: string,
+): Promise<IssueMessageResponse> {
+  return request<IssueMessageResponse>(
+    `/issues/${issueId}/messages/${messageId}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
+    },
+  );
+}
+
+/** DELETE /api/issues/{issueId}/messages/{messageId} — Delete investigator message */
+export async function deleteIssueMessage(
+  issueId: number | string,
+  messageId: number | string,
+): Promise<void> {
+  return request<void>(`/issues/${issueId}/messages/${messageId}`, {
+    method: 'DELETE',
+  });
+}
+
 // Re-export ApiError so callers can instanceof-check it
 export { ApiError };
