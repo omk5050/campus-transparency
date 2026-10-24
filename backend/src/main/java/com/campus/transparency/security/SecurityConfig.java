@@ -64,6 +64,10 @@ public class SecurityConfig {
 
                         // Require ADMIN or SUPER_ADMIN role for organization join code management
                         .requestMatchers("/api/admin/join-codes", "/api/admin/join-codes/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
+
+                        // Require ADMIN or SUPER_ADMIN role for internal notes and investigator messages
+                        .requestMatchers("/api/issues/*/internal-notes", "/api/issues/*/internal-notes/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
+                        .requestMatchers("/api/issues/*/messages", "/api/issues/*/messages/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                         
                         // Allow public access to view the issues feed without being logged in
                         .requestMatchers(HttpMethod.GET, "/api/issues/**").permitAll()

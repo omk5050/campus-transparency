@@ -236,4 +236,39 @@ Atomic Transaction:
    - Codes past `expiresAt` or marked `revoked = true` are rejected.
 6. **Public Preview without Data Leakage:** The `/api/auth/join-codes/{code}/validate` endpoint provides only the institutional display name, type, and target role so the user can verify their organization before registration, exposing no internal credentials or counts.
 
+---
+
+## 10. Phase 2.6 — Internal Notes & Investigator Messaging
+
+### A. Private Case-Management Collaboration Architecture
+To support thorough and ethical complaint investigations, ETHOS provides a strictly segregated collaboration layer attached to individual complaints:
+
+1. **Internal Notes (`issue_internal_notes`):**
+   - Formal case-management records (investigation findings, reminders, evidence analysis, resolution notes).
+   - Author ownership: Each note records its author; only the author (or platform Super Admin) can edit note contents.
+   - Deletion: Can be performed by the author or an institutional administrator of that organization.
+
+2. **Investigator / Admin Messaging (`issue_messages`):**
+   - Private communication channel between assigned investigators and institutional administrators working on the issue.
+   - Chronological, issue-scoped message history.
+   - Sender ownership: Only the sender can edit their message; deletion allowed by sender or organization admin.
+
+### B. Strict Tenant Isolation & Access Control Rules
+1. **Zero Public Exposure:** Internal notes and messages are **NEVER** included in:
+   - Public issue feed (`GET /api/issues`)
+   - Authenticated student issue detail (`GET /api/issues/{id}`)
+   - Public tracking responses (`GET /api/issues/track/{trackingCode}`)
+   - Public transparency statistics or future leaderboards.
+2. **Tenant Scoping & Anti-Enumeration:**
+   - Every note and message query explicitly requires the target issue to belong to the caller's organization.
+   - Any attempt by User A (Organization A) to read, create, update, or delete a note or message on an issue belonging to Organization B returns **`404 NOT_FOUND`** (preventing resource existence enumeration).
+3. **Role Enforcement:**
+   - Normal student/member accounts cannot create or read internal notes or messages (`403 FORBIDDEN`).
+   - Unauthenticated callers are rejected (`401/403`).
+4. **Zero Client Trust:** Neither `organizationId` nor `authorId`/`senderId` are accepted in request payloads. Both are derived strictly from the authenticated security context.
+5. **Audit Trail:**
+   - All collaboration actions are permanently audited in `audit_logs` (`INTERNAL_NOTE_CREATED`, `INTERNAL_NOTE_UPDATED`, `INTERNAL_NOTE_DELETED`, `ISSUE_MESSAGE_SENT`, `ISSUE_MESSAGE_UPDATED`, `ISSUE_MESSAGE_DELETED`).
+   - Records metadata and entity IDs without exposing sensitive content in audit rows.
+
+
 

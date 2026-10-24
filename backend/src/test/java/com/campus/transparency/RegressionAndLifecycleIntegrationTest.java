@@ -175,7 +175,7 @@ public class RegressionAndLifecycleIntegrationTest {
 
         // Admin feed includes hidden issue
         mockMvc.perform(get("/api/issues/admin")
-                        .param("size", "500")
+                        .param("size", "2000")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.[?(@.id == " + issueId + ")]").exists());

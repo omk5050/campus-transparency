@@ -217,7 +217,7 @@ public class OrganizationJoinCodeIntegrationTest {
     @Order(5)
     @WithMockUser(username = "admin_alpha", roles = {"ADMIN"})
     void adminCanListOrganizationJoinCodes() throws Exception {
-        mockMvc.perform(get("/api/admin/join-codes"))
+        mockMvc.perform(get("/api/admin/join-codes").param("size", "500"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray())
                 .andExpect(jsonPath("$.content[?(@.code == '" + studentJoinCodeAlpha + "')]").exists());
