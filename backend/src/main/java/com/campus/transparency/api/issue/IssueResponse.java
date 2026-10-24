@@ -13,6 +13,10 @@ public record IssueResponse(
         boolean hidden,
         int voteCount,
         String reporterAlias,
+        String trackingCode,
+        String category,
+        String department,
+        AssignedUserResponse assignedTo,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -26,6 +30,28 @@ public record IssueResponse(
                 issue.isHidden(),
                 issue.getVoteCount(),
                 reporterAlias,
+                issue.getTrackingCode(),
+                issue.getCategory(),
+                issue.getDepartment(),
+                AssignedUserResponse.from(issue.getAssignedTo()),
+                issue.getCreatedAt(),
+                issue.getUpdatedAt()
+        );
+    }
+
+    public static IssueResponse forPublicTracking(Issue issue, String reporterAlias) {
+        return new IssueResponse(
+                issue.getId(),
+                issue.getTitle(),
+                issue.getDescription(),
+                issue.getStatus(),
+                false,
+                issue.getVoteCount(),
+                reporterAlias,
+                issue.getTrackingCode(),
+                issue.getCategory(),
+                issue.getDepartment(),
+                null,
                 issue.getCreatedAt(),
                 issue.getUpdatedAt()
         );

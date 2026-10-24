@@ -5,6 +5,11 @@ import com.campus.transparency.domain.audit.AuditLogRepository;
 import com.campus.transparency.domain.issue.Issue;
 import com.campus.transparency.domain.issue.IssueRepository;
 import com.campus.transparency.domain.issue.IssueStatus;
+import com.campus.transparency.domain.organization.Organization;
+import com.campus.transparency.domain.user.Role;
+import com.campus.transparency.domain.user.User;
+import com.campus.transparency.domain.user.UserRepository;
+import com.campus.transparency.security.CurrentUserService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,19 +19,44 @@ public class IssueCommandService {
 
     private final IssueRepository issueRepository;
     private final AuditLogRepository auditLogRepository;
+    private final UserRepository userRepository;
+    private final CurrentUserService currentUserService;
 
-    public IssueCommandService(IssueRepository issueRepository, AuditLogRepository auditLogRepository) {
+    public IssueCommandService(
+            IssueRepository issueRepository,
+            AuditLogRepository auditLogRepository,
+            UserRepository userRepository,
+            CurrentUserService currentUserService
+    ) {
         this.issueRepository = issueRepository;
         this.auditLogRepository = auditLogRepository;
+        this.userRepository = userRepository;
+        this.currentUserService = currentUserService;
     }
 
-    /* =========================
-       COMMANDS
-       ========================= */
+    
+    //---COMMANDS---
+    
 
     @Transactional
     public Issue create(String title, String description, String reporterHash) {
-        Issue issue = new Issue(title, description, reporterHash);
+        return create(title, description, reporterHash, "Infrastructure", "Facilities & Operations");
+    }
+
+    @Transactional
+    public Issue create(String title, String description, String reporterHash, String category, String department) {
+        Organization org = null;
+        try {
+            org = currentUserService.getCurrentOrganization();
+        } catch (Exception e) {
+            // In non-web contexts, org will be null unless passed explicitly
+        }
+        return create(title, description, reporterHash, category, department, org);
+    }
+
+    @Transactional
+    public Issue create(String title, String description, String reporterHash, String category, String department, Organization organization) {
+        Issue issue = new Issue(title, description, reporterHash, category, department, organization);
         issue = issueRepository.save(issue);
         auditLogRepository.save(new AuditLog(issue, "ISSUE_CREATED", "system"));
         return issue;
@@ -85,13 +115,64 @@ public class IssueCommandService {
         issueRepository.save(issue);
     }
 
-    /* =========================
-       INTERNALS
-       ========================= */
+    @Transactional
+    public Issue assign(Long issueId, Long userId, String department, String adminActor) {
+        Issue issue = getIssue(issueId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
+
+        if (user.getRole() != Role.ADMIN) {
+            throw new IllegalArgumentException("Only administrative staff / investigators can be assigned to issues");
+        }
+
+        if (issue.getOrganization() != null && (user.getOrganization() == null || !user.getOrganization().getId().equals(issue.getOrganization().getId()))) {
+            throw new IllegalArgumentException("Assignee must belong to the same organization as the issue");
+        }
+
+        issue.assignTo(user);
+        if (department != null && !department.isBlank()) {
+            issue.setDepartment(department);
+        }
+        issue = issueRepository.save(issue);
+
+        String actor = (adminActor != null && !adminActor.isBlank()) ? adminActor : "admin";
+        auditLogRepository.save(new AuditLog(issue, "ISSUE_ASSIGNED", actor + " (assigned to " + user.getUsername() + ")"));
+        return issue;
+    }
+
+    @Transactional
+    public Issue unassign(Long issueId, String adminActor) {
+        Issue issue = getIssue(issueId);
+        User previousAssignee = issue.getAssignedTo();
+        issue.unassign();
+        issue = issueRepository.save(issue);
+
+        String actor = (adminActor != null && !adminActor.isBlank()) ? adminActor : "admin";
+        String details = previousAssignee != null ? " (unassigned from " + previousAssignee.getUsername() + ")" : "";
+        auditLogRepository.save(new AuditLog(issue, "ISSUE_UNASSIGNED", actor + details));
+        return issue;
+    }
+
+    //---INTERNALS---
+     
 
     private Issue getIssue(Long id) {
-        return issueRepository.findById(id)
+        Long orgId = null;
+        try {
+            orgId = currentUserService.getCurrentOrganizationId();
+        } catch (Exception e) {
+            // Unauthenticated or system fallback
+        }
+        return getIssue(id, orgId);
+    }
+
+    private Issue getIssue(Long id, Long organizationId) {
+        Issue issue = issueRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Issue not found: " + id));
+        if (organizationId != null && (issue.getOrganization() == null || !issue.getOrganization().getId().equals(organizationId))) {
+            throw new EntityNotFoundException("Issue not found: " + id);
+        }
+        return issue;
     }
 
     private void transition(Issue issue, IssueStatus targetStatus, String action, String actor) {

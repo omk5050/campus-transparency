@@ -35,3 +35,5 @@ build/
 node_modules/
 **/node_modules/
 frontend/node_modules/
+backend/start-neon.bat
+*.bat.local

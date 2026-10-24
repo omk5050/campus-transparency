@@ -1,0 +1,10 @@
+{
+  "description": "An anonymous issue board for students to post, upvote, and downvote campus concerns, enabling dynamic visibility and prioritization of important topics.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

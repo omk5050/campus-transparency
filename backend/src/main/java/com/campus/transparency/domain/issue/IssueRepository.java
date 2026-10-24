@@ -11,23 +11,23 @@ import java.util.List;
 
 public interface IssueRepository extends JpaRepository<Issue, Long>, JpaSpecificationExecutor<Issue> {
 
-    /**
-     * Public read path.
-     * Hidden issues MUST NOT be exposed.
-     */
+
+    //Public read path.
+    //Hidden issues MUST NOT be exposed.
+     
     Page<Issue> findByHiddenFalse(Pageable pageable);
 
-    /**
-     * Admin / authority read path.
-     * Includes hidden issues.
-     */
+    java.util.Optional<Issue> findByTrackingCode(String trackingCode);
+    java.util.Optional<Issue> findByIdAndOrganizationId(Long id, Long organizationId);
+
+    //Admin / authority read path.
+    //Includes hidden issues.
+     
     @Query("select i from Issue i")
     Page<Issue> findAllIncludingHidden(Pageable pageable);
 
-    /**
-     * Escalation: unresolved issues older than given timestamp.
-     * Used for 7-day and 14-day accountability checks.
-     */
+    //Escalation: unresolved issues older than given timestamp.
+    //Used for 7-day and 14-day accountability checks. 
     @Query("""
         select i from Issue i
         where i.hidden = false

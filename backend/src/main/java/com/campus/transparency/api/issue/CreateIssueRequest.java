@@ -15,5 +15,9 @@ public record CreateIssueRequest(
 
         @NotBlank(message = "Reporter hash is required")
         @Size(max = 64, message = "Reporter hash must be at most 64 characters")
-        String reporterHash
+        String reporterHash,
+
+        String category,
+
+        String department
 ) {}

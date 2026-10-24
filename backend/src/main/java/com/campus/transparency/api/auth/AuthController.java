@@ -1,5 +1,7 @@
 package com.campus.transparency.api.auth;
 
+import com.campus.transparency.domain.user.User;
+import com.campus.transparency.security.CurrentUserService;
 import com.campus.transparency.security.JwtUtil;
 import jakarta.validation.Valid;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -15,11 +17,18 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final UserDetailsService userDetailsService;
     private final JwtUtil jwtUtil;
+    private final CurrentUserService currentUserService;
 
-    public AuthController(AuthenticationManager authenticationManager, UserDetailsService userDetailsService, JwtUtil jwtUtil) {
+    public AuthController(
+            AuthenticationManager authenticationManager,
+            UserDetailsService userDetailsService,
+            JwtUtil jwtUtil,
+            CurrentUserService currentUserService
+    ) {
         this.authenticationManager = authenticationManager;
         this.userDetailsService = userDetailsService;
         this.jwtUtil = jwtUtil;
+        this.currentUserService = currentUserService;
     }
 
     @PostMapping("/login")
@@ -33,4 +42,26 @@ public class AuthController {
 
         return new TokenResponse(jwt);
     }
+
+    @GetMapping("/me")
+    public UserProfileResponse me() {
+        User user = currentUserService.getCurrentUser();
+        OrganizationSummaryResponse orgSummary = null;
+        if (user.getOrganization() != null) {
+            orgSummary = new OrganizationSummaryResponse(
+                    user.getOrganization().getId(),
+                    user.getOrganization().getName(),
+                    user.getOrganization().getOrganizationType().name()
+            );
+        }
+        return new UserProfileResponse(
+                user.getId(),
+                user.getUsername(),
+                user.getRole().name(),
+                orgSummary
+        );
+    }
+
+    public record OrganizationSummaryResponse(Long id, String name, String type) {}
+    public record UserProfileResponse(Long id, String username, String role, OrganizationSummaryResponse organization) {}
 }

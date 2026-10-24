@@ -53,6 +53,12 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("VALIDATION_ERROR", errors.toString());
     }
 
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ErrorResponse handleAccessDenied(org.springframework.security.access.AccessDeniedException ex) {
+        return new ErrorResponse("FORBIDDEN", ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ErrorResponse handleOther(Exception ex) {

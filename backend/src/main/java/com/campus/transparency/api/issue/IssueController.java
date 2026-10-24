@@ -33,9 +33,9 @@ public class IssueController {
         this.tagService = tagService;
     }
 
-    /* =========================
-       COMMANDS
-       ========================= */
+    
+    //---COMMANDS
+    
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -45,7 +45,9 @@ public class IssueController {
         Issue issue = commandService.create(
                 request.title(),
                 request.description(),
-                request.reporterHash()
+                request.reporterHash(),
+                request.category(),
+                request.department()
         );
         String alias = tagService.generateAlias(issue.getReporterHash(), issue.getId());
         return IssueResponse.from(issue, alias);
@@ -91,6 +93,31 @@ public class IssueController {
         commandService.hide(id);
     }
 
+    @PostMapping("/{id}/assign")
+    @PreAuthorize("hasRole('ADMIN')")
+    public IssueResponse assign(
+            @PathVariable Long id,
+            @Valid @RequestBody AssignIssueRequest request,
+            java.security.Principal principal
+    ) {
+        String actor = principal != null ? principal.getName() : "admin";
+        log.info("Admin {} assigning issue {} to user {} (dept: {})", actor, id, request.userId(), request.department());
+        Issue issue = commandService.assign(id, request.userId(), request.department(), actor);
+        return IssueResponse.from(issue, tagService.generateAlias(issue.getReporterHash(), issue.getId()));
+    }
+
+    @PostMapping("/{id}/unassign")
+    @PreAuthorize("hasRole('ADMIN')")
+    public IssueResponse unassign(
+            @PathVariable Long id,
+            java.security.Principal principal
+    ) {
+        String actor = principal != null ? principal.getName() : "admin";
+        log.info("Admin {} unassigning issue {}", actor, id);
+        Issue issue = commandService.unassign(id, actor);
+        return IssueResponse.from(issue, tagService.generateAlias(issue.getReporterHash(), issue.getId()));
+    }
+
     @PostMapping("/{id}/upvote")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
@@ -123,12 +150,13 @@ public class IssueController {
     @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
     public Page<IssueResponse> publicFeed(
             @RequestParam(required = false) com.campus.transparency.domain.issue.IssueStatus status,
+            @RequestParam(required = false) String department,
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.Instant startDate,
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.Instant endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        return queryService.getPublicIssues(status, startDate, endDate, PageRequest.of(page, size))
+        return queryService.getPublicIssues(status, department, startDate, endDate, PageRequest.of(page, size))
                 .map(issue -> IssueResponse.from(issue, tagService.generateAlias(issue.getReporterHash(), issue.getId())));
     }
 
@@ -136,13 +164,35 @@ public class IssueController {
     @PreAuthorize("hasRole('ADMIN')")
     public Page<IssueResponse> adminFeed(
             @RequestParam(required = false) com.campus.transparency.domain.issue.IssueStatus status,
+            @RequestParam(required = false) String department,
+            @RequestParam(required = false) Long assignedTo,
+            @RequestParam(required = false) Boolean unassigned,
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.Instant startDate,
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.Instant endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        return queryService.getAllIssuesForAdmin(status, startDate, endDate, PageRequest.of(page, size))
+        return queryService.getAllIssuesForAdmin(status, department, assignedTo, unassigned, startDate, endDate, PageRequest.of(page, size))
                 .map(issue -> IssueResponse.from(issue, tagService.generateAlias(issue.getReporterHash(), issue.getId())));
+    }
+
+    @GetMapping("/assignees")
+    @PreAuthorize("hasRole('ADMIN')")
+    public java.util.List<AssignedUserResponse> getAssignees() {
+        return queryService.getAssignableUsers();
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
+    public IssueResponse getById(@PathVariable Long id) {
+        Issue issue = queryService.getById(id);
+        return IssueResponse.from(issue, tagService.generateAlias(issue.getReporterHash(), issue.getId()));
+    }
+
+    @GetMapping("/track/{trackingCode}")
+    public IssueResponse getByTrackingCode(@PathVariable String trackingCode) {
+        Issue issue = queryService.getByTrackingCode(trackingCode);
+        return IssueResponse.forPublicTracking(issue, tagService.generateAlias(issue.getReporterHash(), issue.getId()));
     }
 }
 

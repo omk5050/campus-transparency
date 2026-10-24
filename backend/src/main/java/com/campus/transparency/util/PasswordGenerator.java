@@ -15,3 +15,5 @@ public class PasswordGenerator {
         System.out.println("Hashed Password: " + hashedPassword + "\n");
     }
 }
+
+//.\mvnw.cmd compile exec:java "-Dexec.mainClass=com.campus.transparency.util.PasswordGenerator" "-Dexec.args=password"

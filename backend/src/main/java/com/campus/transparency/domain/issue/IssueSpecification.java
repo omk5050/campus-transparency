@@ -21,4 +21,26 @@ public class IssueSpecification {
     public static Specification<Issue> createdBefore(Instant endDate) {
         return (root, query, cb) -> endDate == null ? null : cb.lessThanOrEqualTo(root.get("createdAt"), endDate);
     }
+
+    public static Specification<Issue> hasDepartment(String department) {
+        return (root, query, cb) -> (department == null || department.isBlank())
+                ? null
+                : cb.equal(root.get("department"), department);
+    }
+
+    public static Specification<Issue> assignedToUser(Long userId) {
+        return (root, query, cb) -> userId == null
+                ? null
+                : cb.equal(root.get("assignedTo").get("id"), userId);
+    }
+
+    public static Specification<Issue> isUnassigned() {
+        return (root, query, cb) -> cb.isNull(root.get("assignedTo"));
+    }
+
+    public static Specification<Issue> belongsToOrganization(Long organizationId) {
+        return (root, query, cb) -> organizationId == null
+                ? null
+                : cb.equal(root.get("organization").get("id"), organizationId);
+    }
 }

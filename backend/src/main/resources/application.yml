@@ -3,7 +3,7 @@ spring:
     name: campus-transparency
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/campus_transparency
+    url: jdbc:postgresql://localhost:5432/neondb
     username: campus_app
     password: "@Om1kadam1"
     driver-class-name: org.postgresql.Driver

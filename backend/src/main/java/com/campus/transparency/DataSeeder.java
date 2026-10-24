@@ -7,6 +7,10 @@ import com.campus.transparency.domain.audit.AuditLogRepository;
 import com.campus.transparency.domain.issue.Issue;
 import com.campus.transparency.domain.issue.IssueRepository;
 import com.campus.transparency.application.issue.IssueCommandService;
+import com.campus.transparency.domain.organization.Organization;
+import com.campus.transparency.domain.organization.OrganizationRepository;
+import com.campus.transparency.domain.organization.OrganizationStatus;
+import com.campus.transparency.domain.organization.OrganizationType;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -21,52 +25,80 @@ public class DataSeeder implements CommandLineRunner {
     private final IssueCommandService issueCommandService;
     private final IssueRepository issueRepository;
     private final AuditLogRepository auditLogRepository;
+    private final OrganizationRepository organizationRepository;
 
     public DataSeeder(UserRepository userRepository, 
                       PasswordEncoder passwordEncoder,
                       IssueCommandService issueCommandService,
                       IssueRepository issueRepository,
-                      AuditLogRepository auditLogRepository) {
+                      AuditLogRepository auditLogRepository,
+                      OrganizationRepository organizationRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.issueCommandService = issueCommandService;
         this.issueRepository = issueRepository;
         this.auditLogRepository = auditLogRepository;
+        this.organizationRepository = organizationRepository;
     }
 
-    private void seedIssue(String title, String description, String reporterHash, int votes) {
-        Issue issue = issueCommandService.create(title, description, reporterHash);
+    private void seedIssue(String title, String description, String reporterHash, int votes, Organization org) {
+        Issue issue = issueCommandService.create(title, description, reporterHash, "Infrastructure", "Facilities & Operations", org);
         for(int i = 0; i < votes - 1; i++) {
             issue.upvote();
         }
         issueRepository.save(issue);
     }
 
+    private void seedIssue(String title, String description, String reporterHash, int votes) {
+        Organization defaultOrg = organizationRepository.findByName("ETHOS University Campus").orElse(null);
+        seedIssue(title, description, reporterHash, votes, defaultOrg);
+    }
+
     @Override
     public void run(String... args) throws Exception {
+        Organization defaultOrg = organizationRepository.findByName("ETHOS University Campus")
+                .orElseGet(() -> organizationRepository.save(new Organization(
+                        "ETHOS University Campus",
+                        OrganizationType.UNIVERSITY,
+                        OrganizationStatus.ACTIVE,
+                        "admin@ethos-campus.edu"
+                )));
+
         if (userRepository.count() == 0) {
             String adminPassword = passwordEncoder.encode("admin123");
-            User admin = new User("admin", adminPassword, Role.ADMIN);
+            User admin = new User("admin", adminPassword, Role.ADMIN, defaultOrg);
             
             String studentPassword = passwordEncoder.encode("student123");
-            User student = new User("student", studentPassword, Role.STUDENT);
+            User student = new User("student", studentPassword, Role.STUDENT, defaultOrg);
             
             userRepository.save(admin);
             userRepository.save(student);
             System.out.println("Seeded default users: admin/admin123, student/student123");
         }
 
+        if (userRepository.findByUsername("investigator").isEmpty()) {
+            String invPassword = passwordEncoder.encode("investigator123");
+            User investigator = new User("investigator", invPassword, Role.ADMIN, defaultOrg);
+            userRepository.save(investigator);
+            System.out.println("Seeded investigator user: investigator/investigator123");
+        }
+
+        userRepository.findAll().forEach(u -> {
+            if (u.getOrganization() == null) {
+                u.setOrganization(defaultOrg);
+                userRepository.save(u);
+            }
+        });
+
         java.io.File flag = new java.io.File(".seeded_issues_v2");
-        if (!flag.exists()) {
-            System.out.println("Clearing and reseeding 15 professional campus issues...");
-            auditLogRepository.deleteAllInBatch();
-            issueRepository.deleteAllInBatch();
+        if (!flag.exists() && issueRepository.count() == 0) {
+            System.out.println("Seeding 15 professional campus issues...");
             
             Random random = new Random();
 
             seedIssue("HVAC Malfunction in Engineering Building Labs",
                 "The air conditioning in the 3rd-floor computer labs has been non-functional for over two weeks, leading to unsafe operating temperatures for both students and high-performance workstation equipment. Immediate repair is required to prevent hardware damage.",
-                "anon_1042", random.nextInt(40) + 10);
+                "anon_1042", random.nextInt(40) + 10, defaultOrg);
 
             seedIssue("Inadequate Lighting on South Campus Walkways",
                 "Following the recent daylight saving time change, the pathways connecting the South Campus dormitories to the main academic quad are dangerously unlit after 5 PM. Several streetlamps require immediate bulb replacement or electrical repair to ensure student safety.",
