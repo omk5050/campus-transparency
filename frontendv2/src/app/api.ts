@@ -138,7 +138,7 @@ async function request<T>(
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
-  if (!headers.has('Content-Type') && options.body !== undefined) {
+  if (!headers.has('Content-Type') && options.body !== undefined && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -816,6 +816,53 @@ export async function markAllNotificationsRead(): Promise<void> {
   });
 }
 
+// ─── Attachments (Phase 2.8B) ────────────────────────────────────────────────
+
+export interface IssueAttachment {
+  id: number;
+  issueId: number;
+  originalFilename: string;
+  secureUrl: string;
+  resourceType: string;
+  format?: string;
+  bytes: number;
+  width?: number;
+  height?: number;
+  createdAt: string;
+  uploadedByUsername?: string;
+}
+
+/** GET /api/issues/{issueId}/attachments — Get attachments for an issue */
+export async function getIssueAttachments(
+  issueId: number | string,
+): Promise<IssueAttachment[]> {
+  return request<IssueAttachment[]>(`/issues/${issueId}/attachments`);
+}
+
+/** POST /api/issues/{issueId}/attachments — Upload an image attachment */
+export async function uploadIssueAttachment(
+  issueId: number | string,
+  file: File,
+): Promise<IssueAttachment> {
+  const formData = new FormData();
+  formData.append('file', file);
+  return request<IssueAttachment>(`/issues/${issueId}/attachments`, {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+/** DELETE /api/issues/{issueId}/attachments/{attachmentId} — Delete an attachment */
+export async function deleteIssueAttachment(
+  issueId: number | string,
+  attachmentId: number | string,
+): Promise<void> {
+  return request<void>(`/issues/${issueId}/attachments/${attachmentId}`, {
+    method: 'DELETE',
+  });
+}
+
 // Re-export ApiError so callers can instanceof-check it
 export { ApiError };
+
 

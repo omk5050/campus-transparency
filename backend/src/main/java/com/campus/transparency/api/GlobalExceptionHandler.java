@@ -71,10 +71,21 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("UNAUTHORIZED", "Invalid username or password");
     }
 
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleMaxUploadSizeExceeded(org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
+        return new ErrorResponse("FILE_TOO_LARGE", "File size exceeds maximum allowed limit of 10MB");
+    }
+
+    @ExceptionHandler(com.campus.transparency.application.attachment.ImageStorageException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ErrorResponse handleImageStorageException(com.campus.transparency.application.attachment.ImageStorageException ex) {
+        return new ErrorResponse("IMAGE_STORAGE_ERROR", "Image storage operation failed: " + ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ErrorResponse handleOther(Exception ex) {
-        ex.printStackTrace();
         return new ErrorResponse("INTERNAL_SERVER_ERROR", ex.getMessage() != null ? ex.getMessage() : "Internal server error");
     }
 

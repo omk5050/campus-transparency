@@ -69,6 +69,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/issues/*/internal-notes", "/api/issues/*/internal-notes/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .requestMatchers("/api/issues/*/messages", "/api/issues/*/messages/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                         
+                        // Require authentication for issue attachments
+                        .requestMatchers("/api/issues/*/attachments", "/api/issues/*/attachments/**").authenticated()
+
                         // Require authentication for notification endpoints
                         .requestMatchers("/api/notifications", "/api/notifications/**").authenticated()
 
