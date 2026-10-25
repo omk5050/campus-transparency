@@ -1,5 +1,9 @@
 {
-  "description": "An anonymous issue board for students to post, upvote, and downvote campus concerns, enabling dynamic visibility and prioritization of important topics.",
+  "title": "ETHOS — Ethical Governance System",
+  "description": "ETHOS — Ethical Governance System: An anonymous grievance and privacy-preserving institutional transparency platform.",
+  "icons": {
+    "icon": "/icon.svg"
+  },
   "robots": {
     "index": false
   },

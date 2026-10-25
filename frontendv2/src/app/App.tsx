@@ -130,6 +130,7 @@ import { PublicTransparencyLeaderboard } from "./components/PublicTransparencyLe
 import { PublicForum } from "./components/PublicForum";
 import { AdminForumModeration } from "./components/AdminForumModeration";
 import { SuperAdminForumGovernance } from "./components/SuperAdminForumGovernance";
+import { EthosLogo } from "./components/EthosLogo";
 
 // ─── Design constants ──────────────────────────────────────────────────────────
 const C = {
@@ -364,12 +365,7 @@ function SpacesView({
         style={{ borderColor: C.border }}
       >
         <div className="flex items-center gap-3">
-          <div
-            className="w-6 h-6 flex items-center justify-center font-mono font-bold text-xs"
-            style={{ background: C.cyan, color: C.bg }}
-          >
-            E
-          </div>
+          <EthosLogo size={24} />
           <span
             className="font-mono text-xs uppercase tracking-[0.2em]"
             style={{ color: C.textSub }}
@@ -1124,12 +1120,7 @@ function OrgSidebar({
         className="px-5 py-4 border-b flex items-center gap-2.5"
         style={{ borderColor: C.border }}
       >
-        <div
-          className="w-6 h-6 flex items-center justify-center font-mono font-bold text-xs flex-shrink-0"
-          style={{ background: C.cyan, color: C.bg }}
-        >
-          E
-        </div>
+        <EthosLogo size={24} />
         <span
           className="font-mono text-xs uppercase tracking-[0.15em]"
           style={{ color: C.textSub }}
@@ -5055,12 +5046,7 @@ function LoginView({
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-2.5 mb-5">
-            <div
-              className="w-7 h-7 flex items-center justify-center font-mono font-bold text-sm"
-              style={{ background: C.cyan, color: C.bg }}
-            >
-              E
-            </div>
+            <EthosLogo size={28} />
             <span
               className="font-mono text-sm uppercase tracking-[0.2em]"
               style={{ color: C.textSub }}

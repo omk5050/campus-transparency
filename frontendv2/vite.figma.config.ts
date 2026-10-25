@@ -94,7 +94,7 @@ function figmaSiteConfiguration(config: FigmaSiteConfiguration): Plugin {
   const clean = (value: string | undefined) => value?.replace(/[^a-zA-Z0-9_-]/g, '') || ''
   const escape = (value: string) =>
     value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  const title = config.title ?? 'Figma Make App'
+  const title = config.title ?? 'ETHOS — Ethical Governance System'
   const description = config.description ?? ''
   const socialImage = config.openGraph?.image ?? ''
   const language = clean(config.language) || 'en'

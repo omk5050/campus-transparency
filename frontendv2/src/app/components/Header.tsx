@@ -1,7 +1,8 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { clsx } from 'clsx';
-import { Plus, Terminal, Lock } from 'lucide-react';
+import { Plus, Lock } from 'lucide-react';
+import { EthosLogo } from './EthosLogo';
 
 type HeaderSortOption = 'TRENDING' | 'TOP' | 'NEW' | 'UNRESOLVED';
 
@@ -19,15 +20,13 @@ export function Header({ sortBy, onSortChange, onSubmitClick, onAdminClick }: {
         
         {/* Logo */}
         <div className="flex items-center space-x-3 group cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-          <div className="w-10 h-10 bg-[#00E5FF] flex items-center justify-center text-[#0B0F14]">
-            <Terminal size={24} strokeWidth={2.5} />
-          </div>
+          <EthosLogo size={36} />
           <div className="flex flex-col">
             <h1 className="text-xl font-serif tracking-tighter leading-none text-[#E0E0E0] group-hover:text-white transition-colors">
-              CAMPUS SIGNAL
+              ETHOS
             </h1>
-            <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#00E5FF] group-hover:tracking-[0.3em] transition-all">
-              Public Terminal
+            <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#00C8E8] group-hover:tracking-[0.3em] transition-all">
+              Ethical Governance
             </span>
           </div>
         </div>
