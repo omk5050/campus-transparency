@@ -127,6 +127,7 @@ public class InternalNotesAndMessagingIntegrationTest {
                 "Facilities",
                 orgAlpha
         );
+        issueAlpha.setReporter(studentAlpha);
         issueAlpha.assignTo(investigatorAlpha);
         issueAlpha = issueRepository.save(issueAlpha);
 
@@ -138,6 +139,7 @@ public class InternalNotesAndMessagingIntegrationTest {
                 "Operations",
                 orgBeta
         );
+        issueBeta.setReporter(studentBeta);
         issueBeta.assignTo(investigatorBeta);
         issueBeta = issueRepository.save(issueBeta);
     }
