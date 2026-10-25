@@ -128,14 +128,18 @@ class ApiError extends Error {
   }
 }
 
+export interface RequestOptions extends RequestInit {
+  auth?: boolean;
+}
+
 async function request<T>(
   path: string,
-  options: RequestInit = {},
+  options: RequestOptions = {},
 ): Promise<T> {
   const token = getToken();
   const headers = new Headers(options.headers ?? {});
 
-  if (token) {
+  if (token && options.auth !== false) {
     headers.set('Authorization', `Bearer ${token}`);
   }
   if (!headers.has('Content-Type') && options.body !== undefined && !(options.body instanceof FormData)) {
@@ -166,6 +170,9 @@ async function request<T>(
     // 401 means token is expired / invalid — clear it so the UI can redirect to login
     if (response.status === 401) {
       clearToken();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth:expired'));
+      }
     }
 
     throw new ApiError(response.status, code, message);

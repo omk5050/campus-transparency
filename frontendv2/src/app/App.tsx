@@ -1068,45 +1068,47 @@ function OrgSidebar({
 
   if (isStudentRole) {
     roleNavItems.push(
-      { id: "FORUM", label: "Public Forum", icon: <MessageSquare size={15} /> },
       { id: "REPORTS", label: "My Complaints", icon: <FileText size={15} />, badge: unresolvedCount },
       { id: "SUBMIT", label: "Submit Complaint", icon: <Plus size={15} /> },
       { id: "TRACK", label: "Track a Report", icon: <Eye size={15} /> },
+      { id: "FORUM", label: "Forum", icon: <MessageSquare size={15} /> },
       { id: "LEADERBOARD", label: "Leaderboard & Stats", icon: <Trophy size={15} /> },
+      { id: "NOTIFICATIONS", label: "Notifications", icon: <Bell size={15} />, badge: unreadNotifications },
     );
   } else if (isInvestigatorRole) {
     roleNavItems.push(
-      { id: "FORUM", label: "Public Forum", icon: <MessageSquare size={15} /> },
       { id: "REPORTS", label: "Assigned Cases", icon: <FileText size={15} />, badge: unresolvedCount },
       { id: "TRACK", label: "Track a Report", icon: <Eye size={15} /> },
+      { id: "FORUM", label: "Forum", icon: <MessageSquare size={15} /> },
       { id: "LEADERBOARD", label: "Leaderboard & Stats", icon: <Trophy size={15} /> },
+      { id: "NOTIFICATIONS", label: "Notifications", icon: <Bell size={15} />, badge: unreadNotifications },
     );
   } else if (isSuperAdminRole) {
     roleNavItems.push(
       { id: "PLATFORM", label: "Platform Overview", icon: <Terminal size={15} />, color: C.rose },
-      { id: "FORUM_GOVERNANCE", label: "Forum Governance", icon: <ShieldAlert size={15} />, color: C.rose },
-      { id: "FORUM", label: "Public Forum", icon: <MessageSquare size={15} /> },
       { id: "ORG_APPLICATIONS", label: "Org Applications", icon: <Building2 size={15} />, color: C.rose },
       { id: "JOIN_CODES", label: "Join Codes", icon: <Hash size={15} /> },
       { id: "OVERVIEW", label: "Org Overview", icon: <LayoutGrid size={15} /> },
       { id: "ADMIN", label: "Case Management", icon: <Shield size={15} />, badge: unresolvedCount },
       { id: "REPORTS", label: "All Complaints", icon: <FileText size={15} /> },
-      { id: "TRACK", label: "Track a Report", icon: <Eye size={15} /> },
+      { id: "FORUM_GOVERNANCE", label: "Forum Governance", icon: <ShieldAlert size={15} />, color: C.rose },
       { id: "LEADERBOARD", label: "Leaderboard & Stats", icon: <Trophy size={15} /> },
+      { id: "TRACK", label: "Track a Report", icon: <Eye size={15} /> },
+      { id: "NOTIFICATIONS", label: "Notifications", icon: <Bell size={15} />, badge: unreadNotifications },
     );
   } else {
     // Org Admin
     roleNavItems.push(
       { id: "OVERVIEW", label: "Overview", icon: <LayoutGrid size={15} /> },
-      { id: "FORUM_MODERATION", label: "Forum Moderation", icon: <Flag size={15} /> },
-      { id: "FORUM", label: "Public Forum", icon: <MessageSquare size={15} /> },
       { id: "ADMIN", label: "Case Management", icon: <Shield size={15} />, badge: unresolvedCount },
       { id: "REPORTS", label: "All Complaints", icon: <FileText size={15} /> },
       { id: "JOIN_CODES", label: "Join Codes", icon: <Hash size={15} /> },
       { id: "SETTINGS", label: "Org Settings", icon: <Settings size={15} /> },
       { id: "MODERATION", label: "Moderation Queue", icon: <Flag size={15} /> },
-      { id: "TRACK", label: "Track a Report", icon: <Eye size={15} /> },
+      { id: "FORUM_MODERATION", label: "Forum Moderation", icon: <Flag size={15} /> },
       { id: "LEADERBOARD", label: "Leaderboard & Stats", icon: <Trophy size={15} /> },
+      { id: "TRACK", label: "Track a Report", icon: <Eye size={15} /> },
+      { id: "NOTIFICATIONS", label: "Notifications", icon: <Bell size={15} />, badge: unreadNotifications },
     );
   }
 
@@ -1320,7 +1322,7 @@ function OrgSidebar({
         >
           <LogOut size={12} />
           <span className="font-mono text-[10px] uppercase tracking-widest">
-            All Spaces
+            Sign Out
           </span>
         </button>
       </div>
@@ -2502,7 +2504,7 @@ function ReportDetailView({
                 ] as const
               : [
                   { id: "overview", label: "Overview" },
-                  { id: "communication", label: "Messages" },
+                  { id: "communication", label: "Messages & Notes" },
                   { id: "evidence", label: `Evidence (${report.evidence.length})` },
                   { id: "assignment", label: "Assignment" },
                   { id: "resolution", label: "Resolution" },
@@ -2525,41 +2527,29 @@ function ReportDetailView({
 
           {detailTab === "overview" && (
             <div className="space-y-4">
-              {/* Internal note (admin / investigator) */}
+              <div className="p-4 border font-mono text-xs space-y-2" style={{ borderColor: C.border, background: C.surface }}>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold uppercase tracking-wider" style={{ color: C.text }}>Case Tracking Code</span>
+                  <span className="px-2 py-0.5 border font-bold" style={{ borderColor: `${C.cyan}40`, color: C.cyan, background: `${C.cyan}0A` }}>
+                    {report.trackingCode || "N/A"}
+                  </span>
+                </div>
+                <p className="text-[11px] leading-relaxed" style={{ color: C.textDim }}>
+                  Use this tracking code on the public verification portal to check status updates without logging in.
+                </p>
+              </div>
               {(isAdmin || isInvestigator) && (
-                <div>
-                  <div
-                    className="font-mono text-[10px] uppercase tracking-widest mb-2"
-                    style={{ color: C.textDim }}
-                  >
-                    Internal Note (Staff only)
+                <div className="p-4 border font-mono text-xs flex items-center justify-between" style={{ borderColor: `${C.rose}30`, background: `${C.rose}06` }}>
+                  <div>
+                    <div className="font-bold" style={{ color: C.rose }}>Staff Case Investigation Active</div>
+                    <div className="text-[10px]" style={{ color: C.textDim }}>Secure messages and official internal notes are recorded under the Messages & Notes tab.</div>
                   </div>
-                  <textarea
-                    value={internalNote}
-                    onChange={(e) =>
-                      setInternalNote(e.target.value)
-                    }
-                    rows={3}
-                    placeholder="Add an internal note visible only to administrators and investigators..."
-                    className="w-full px-4 py-3 font-mono text-xs border bg-transparent outline-none resize-none transition-all"
-                    style={{ borderColor: C.border, color: C.text }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = C.cyan;
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = C.border;
-                    }}
-                  />
                   <button
-                    onClick={() => toast.success("Note saved")}
-                    className="mt-2 flex items-center gap-2 px-4 py-1.5 font-mono text-xs uppercase tracking-widest"
-                    style={{
-                      background: C.surface2,
-                      color: C.textSub,
-                      border: `1px solid ${C.border}`,
-                    }}
+                    onClick={() => setDetailTab("communication")}
+                    className="px-3 py-1.5 border font-mono text-[10px] uppercase tracking-wider"
+                    style={{ borderColor: C.rose, color: C.rose }}
                   >
-                    <Check size={11} /> Save Note
+                    Open Notes →
                   </button>
                 </div>
               )}
@@ -5226,6 +5216,23 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
+  const handleLogout = () => {
+    apiLogout();
+    setReports([]);
+    setCurrentOrg(null);
+    setUserProfile(null);
+    navigateTo("/login", "LOGIN");
+  };
+
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      toast.error("Session expired. Please sign in again.");
+      handleLogout();
+    };
+    window.addEventListener("auth:expired", handleAuthExpired);
+    return () => window.removeEventListener("auth:expired", handleAuthExpired);
+  }, []);
+
   const loadUserProfile = async () => {
     if (!isAuthenticated()) return;
     try {
@@ -5254,8 +5261,10 @@ export default function App() {
           verificationStatus: 'VERIFIED',
         });
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        handleLogout();
+      }
     }
   };
 
@@ -5346,14 +5355,6 @@ export default function App() {
   const handleLoginSuccess = async () => {
     await loadUserProfile();
     navigateTo("/", "SPACES");
-  };
-
-  const handleLogout = () => {
-    apiLogout();
-    setReports([]);
-    setCurrentOrg(null);
-    setUserProfile(null);
-    navigateTo("/login", "LOGIN");
   };
 
   // ── Navigation handlers ───────────────────────────────────────────────────────

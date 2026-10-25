@@ -50,7 +50,7 @@ export function mapIssueToReport(issue: BackendIssueResponse): Report {
     id: String(issue.id),
 
     // ─── [TRANSFORMED] reporterAlias → anonymousId ──────────────────────────
-    anonymousId: issue.reporterAlias,
+    anonymousId: issue.reporterAlias || 'Protected Anonymous Member',
 
     // ─── [DIRECT] ────────────────────────────────────────────────────────────
     title: issue.title,
