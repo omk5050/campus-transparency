@@ -33,8 +33,11 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.campus.transparency.testconfig.IsolatedTestDatabase;
+
 @SpringBootTest
 @AutoConfigureMockMvc
+@IsolatedTestDatabase
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class IssueAttachmentIntegrationTest {

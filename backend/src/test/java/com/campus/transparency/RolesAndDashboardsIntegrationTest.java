@@ -29,8 +29,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.campus.transparency.testconfig.IsolatedTestDatabase;
+
 @SpringBootTest
 @AutoConfigureMockMvc
+@IsolatedTestDatabase
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class RolesAndDashboardsIntegrationTest {
 

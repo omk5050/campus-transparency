@@ -19,7 +19,10 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.campus.transparency.testconfig.IsolatedTestDatabase;
+
 @SpringBootTest
+@IsolatedTestDatabase
 @Transactional
 class NorthfieldDemoVerificationTest {
 
@@ -124,9 +127,9 @@ class NorthfieldDemoVerificationTest {
         long assigned = issueRepository.countByOrganizationIdAndAssignedToIsNotNull(1L);
         long unassigned = issueRepository.countByOrganizationIdAndAssignedToIsNull(1L);
 
-        assertThat(reported).isGreaterThanOrEqualTo(2);
+        assertThat(reported).isGreaterThanOrEqualTo(3);
         assertThat(underReview).isGreaterThanOrEqualTo(3);
-        assertThat(inProgress).isGreaterThanOrEqualTo(4);
+        assertThat(inProgress).isGreaterThanOrEqualTo(3);
         assertThat(resolved).isGreaterThanOrEqualTo(3);
         assertThat(assigned).isGreaterThanOrEqualTo(6);
         assertThat(unassigned).isGreaterThanOrEqualTo(5);

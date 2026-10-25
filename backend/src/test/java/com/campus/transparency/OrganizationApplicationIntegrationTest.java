@@ -24,8 +24,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.campus.transparency.testconfig.IsolatedTestDatabase;
+
 @SpringBootTest
 @AutoConfigureMockMvc
+@IsolatedTestDatabase
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class OrganizationApplicationIntegrationTest {
 

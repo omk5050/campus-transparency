@@ -1,9 +1,11 @@
 package com.campus.transparency;
 
+import com.campus.transparency.testconfig.IsolatedTestDatabase;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
+@IsolatedTestDatabase
 class CampusTransparencyApplicationTests {
 
 	static {

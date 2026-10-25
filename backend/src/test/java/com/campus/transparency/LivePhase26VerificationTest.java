@@ -32,7 +32,10 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.campus.transparency.testconfig.IsolatedTestDatabase;
+
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@IsolatedTestDatabase
 public class LivePhase26VerificationTest {
 
     static {

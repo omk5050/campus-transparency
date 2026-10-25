@@ -27,6 +27,8 @@ public final class DotenvLoader {
             Path.of("../../.env")
         };
 
+        boolean isTest = isTestExecution();
+
         for (Path path : searchPaths) {
             if (Files.isRegularFile(path)) {
                 try {
@@ -43,23 +45,64 @@ public final class DotenvLoader {
                             (value.startsWith("'") && value.endsWith("'"))) {
                             value = value.substring(1, value.length() - 1);
                         }
+
+                        // SECURITY GUARD: Never load or set production datasource in test executions
+                        if (isTest) {
+                            String upperKey = key.toUpperCase();
+                            if (upperKey.startsWith("SPRING_DATASOURCE") || 
+                                upperKey.contains("DATASOURCE") || 
+                                upperKey.equals("DATABASE_URL")) {
+                                continue;
+                            }
+                        }
+
                         if (System.getProperty(key) == null) {
                             System.setProperty(key, value);
                         }
-                        if (key.equalsIgnoreCase("SPRING_DATASOURCE_URL")) {
-                            System.setProperty("spring.datasource.url", value);
-                        }
-                        if (key.equalsIgnoreCase("SPRING_DATASOURCE_USERNAME")) {
-                            System.setProperty("spring.datasource.username", value);
-                        }
-                        if (key.equalsIgnoreCase("SPRING_DATASOURCE_PASSWORD")) {
-                            System.setProperty("spring.datasource.password", value);
+
+                        if (!isTest) {
+                            if (key.equalsIgnoreCase("SPRING_DATASOURCE_URL")) {
+                                System.setProperty("spring.datasource.url", value);
+                            }
+                            if (key.equalsIgnoreCase("SPRING_DATASOURCE_USERNAME")) {
+                                System.setProperty("spring.datasource.username", value);
+                            }
+                            if (key.equalsIgnoreCase("SPRING_DATASOURCE_PASSWORD")) {
+                                System.setProperty("spring.datasource.password", value);
+                            }
                         }
                     }
+
+                    if (isTest) {
+                        System.clearProperty("spring.datasource.url");
+                        System.clearProperty("spring.datasource.username");
+                        System.clearProperty("spring.datasource.password");
+                        System.clearProperty("SPRING_DATASOURCE_URL");
+                        System.clearProperty("SPRING_DATASOURCE_USERNAME");
+                        System.clearProperty("SPRING_DATASOURCE_PASSWORD");
+                    }
+
                     loaded = true;
                     break;
                 } catch (IOException ignored) {}
             }
         }
+    }
+
+    public static boolean isTestExecution() {
+        for (StackTraceElement ste : Thread.currentThread().getStackTrace()) {
+            String cls = ste.getClassName();
+            if (cls.startsWith("org.junit") || 
+                cls.contains("TestContextManager") || 
+                cls.contains("SpringBootTestContextBootstrapper") ||
+                cls.contains("surefire")) {
+                return true;
+            }
+        }
+        if (System.getProperty("surefire.test.class.path") != null ||
+            System.getProperty("org.springframework.test.context.SpringBootTest") != null) {
+            return true;
+        }
+        return false;
     }
 }
