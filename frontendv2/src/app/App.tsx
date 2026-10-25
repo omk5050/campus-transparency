@@ -3031,10 +3031,51 @@ function SubmitReportView({
     location: "",
     urgency: "MEDIUM",
   });
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [attachedPreviewUrl, setAttachedPreviewUrl] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [trackingCode] = useState(
     () =>
       `TRK-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
   );
+
+  const handleFileSelect = (file: File) => {
+    if (!file) return;
+
+    const lowerType = file.type.toLowerCase();
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    const isValidType =
+      ['image/jpeg', 'image/png', 'image/webp'].includes(lowerType) ||
+      ['jpg', 'jpeg', 'png', 'webp'].includes(extension || '');
+
+    if (!isValidType) {
+      toast.error('Unsupported format. Allowed: JPEG, PNG, or WebP images.');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File size exceeds the 10 MB limit');
+      return;
+    }
+
+    setAttachedFile(file);
+    if (attachedPreviewUrl) {
+      URL.revokeObjectURL(attachedPreviewUrl);
+    }
+    setAttachedPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const clearAttachedFile = () => {
+    setAttachedFile(null);
+    if (attachedPreviewUrl) {
+      URL.revokeObjectURL(attachedPreviewUrl);
+      setAttachedPreviewUrl(null);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const set = (k: string, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -3346,36 +3387,137 @@ function SubmitReportView({
                 optional.
               </p>
             </div>
-            <div
-              className="border-2 border-dashed flex flex-col items-center justify-center py-16 gap-3 transition-colors"
-              style={{ borderColor: C.border2 }}
-            >
-              <Paperclip
-                size={28}
-                style={{ color: C.textDim }}
-              />
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  handleFileSelect(e.target.files[0]);
+                }
+              }}
+            />
+
+            {attachedFile ? (
               <div
-                className="font-mono text-xs uppercase tracking-widest"
-                style={{ color: C.textDim }}
+                className="border p-4 flex items-center justify-between gap-4"
+                style={{ borderColor: C.cyan, background: `${C.cyan}06` }}
               >
-                Drag files here or click to select
+                <div className="flex items-center gap-3 overflow-hidden">
+                  {attachedPreviewUrl ? (
+                    <img
+                      src={attachedPreviewUrl}
+                      alt="Attached Preview"
+                      className="w-14 h-14 object-cover border flex-shrink-0"
+                      style={{ borderColor: C.border }}
+                    />
+                  ) : (
+                    <Paperclip size={24} style={{ color: C.cyan }} />
+                  )}
+                  <div className="overflow-hidden">
+                    <div
+                      className="font-mono text-xs truncate font-medium"
+                      style={{ color: C.text }}
+                      title={attachedFile.name}
+                    >
+                      {attachedFile.name}
+                    </div>
+                    <div
+                      className="font-mono text-[10px] mt-0.5"
+                      style={{ color: C.textDim }}
+                    >
+                      {(attachedFile.size / (1024 * 1024)).toFixed(2)} MB · Selected for upload
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-3 py-1.5 border font-mono text-[10px] uppercase tracking-widest transition-opacity hover:opacity-70"
+                    style={{ borderColor: C.border2, color: C.textSub }}
+                  >
+                    Change
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearAttachedFile}
+                    className="p-1.5 border hover:opacity-70 transition-opacity"
+                    style={{ borderColor: C.border2, color: C.rose }}
+                    title="Remove file"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
               </div>
+            ) : (
               <div
-                className="font-mono text-[10px]"
-                style={{ color: C.textDim }}
-              >
-                Images, PDFs, documents — max 20 MB per file
-              </div>
-              <button
-                className="px-4 py-2 border font-mono text-xs uppercase tracking-widest transition-opacity hover:opacity-70"
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDragActive(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDragActive(false);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDragActive(true);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDragActive(false);
+                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    handleFileSelect(e.dataTransfer.files[0]);
+                  }
+                }}
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed flex flex-col items-center justify-center py-14 gap-3 transition-colors cursor-pointer hover:border-cyan-500/50"
                 style={{
-                  borderColor: C.border2,
-                  color: C.textSub,
+                  borderColor: dragActive ? C.cyan : C.border2,
+                  background: dragActive ? `${C.cyan}08` : "transparent",
                 }}
               >
-                Browse Files
-              </button>
-            </div>
+                <Paperclip
+                  size={28}
+                  style={{ color: dragActive ? C.cyan : C.textDim }}
+                />
+                <div
+                  className="font-mono text-xs uppercase tracking-widest"
+                  style={{ color: dragActive ? C.cyan : C.textDim }}
+                >
+                  Drag files here or click to select
+                </div>
+                <div
+                  className="font-mono text-[10px]"
+                  style={{ color: C.textDim }}
+                >
+                  JPEG, PNG, or WebP images — max 10 MB per file
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
+                  className="px-4 py-2 border font-mono text-xs uppercase tracking-widest transition-opacity hover:opacity-70"
+                  style={{
+                    borderColor: C.border2,
+                    color: C.cyan,
+                    background: `${C.cyan}0C`,
+                  }}
+                >
+                  Browse Files
+                </button>
+              </div>
+            )}
             <div
               className="p-3 border"
               style={{

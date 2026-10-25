@@ -61,6 +61,8 @@ export function EvidenceWorkspace({ caseId, isAdmin, onEvidenceAdded }: Evidence
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [previewAttachment, setPreviewAttachment] = useState<IssueAttachment | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedPreviewUrl, setSelectedPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchAttachments = async () => {
@@ -81,11 +83,17 @@ export function EvidenceWorkspace({ caseId, isAdmin, onEvidenceAdded }: Evidence
     fetchAttachments();
   }, [caseId]);
 
-  const handleFileUpload = async (file: File) => {
+  const handleFileSelect = (file: File) => {
     if (!file) return;
 
-    if (!ALLOWED_TYPES.includes(file.type.toLowerCase())) {
-      toast.error('Unsupported format. Allowed: JPEG, PNG, WebP');
+    const lowerType = file.type.toLowerCase();
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    const isValidType =
+      ALLOWED_TYPES.includes(lowerType) ||
+      ['jpg', 'jpeg', 'png', 'webp'].includes(extension || '');
+
+    if (!isValidType) {
+      toast.error('Unsupported format. Allowed: JPEG, PNG, or WebP images.');
       return;
     }
 
@@ -93,6 +101,28 @@ export function EvidenceWorkspace({ caseId, isAdmin, onEvidenceAdded }: Evidence
       toast.error('File size exceeds the 10 MB limit');
       return;
     }
+
+    setSelectedFile(file);
+    if (selectedPreviewUrl) {
+      URL.revokeObjectURL(selectedPreviewUrl);
+    }
+    setSelectedPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const clearSelectedFile = () => {
+    setSelectedFile(null);
+    if (selectedPreviewUrl) {
+      URL.revokeObjectURL(selectedPreviewUrl);
+      setSelectedPreviewUrl(null);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleFileUpload = async (fileToUpload?: File) => {
+    const file = fileToUpload || selectedFile;
+    if (!file) return;
 
     try {
       setUploading(true);
@@ -102,14 +132,12 @@ export function EvidenceWorkspace({ caseId, isAdmin, onEvidenceAdded }: Evidence
       if (onEvidenceAdded) {
         onEvidenceAdded(newAtt);
       }
+      clearSelectedFile();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Image upload failed';
       toast.error(msg);
     } finally {
       setUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
     }
   };
 
@@ -149,7 +177,7 @@ export function EvidenceWorkspace({ caseId, isAdmin, onEvidenceAdded }: Evidence
     setDragActive(false);
     if (!isAdmin) return;
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileUpload(e.dataTransfer.files[0]);
+      handleFileSelect(e.dataTransfer.files[0]);
     }
   };
 
@@ -164,7 +192,7 @@ export function EvidenceWorkspace({ caseId, isAdmin, onEvidenceAdded }: Evidence
           className="hidden"
           onChange={e => {
             if (e.target.files && e.target.files[0]) {
-              handleFileUpload(e.target.files[0]);
+              handleFileSelect(e.target.files[0]);
             }
           }}
         />
@@ -301,39 +329,111 @@ export function EvidenceWorkspace({ caseId, isAdmin, onEvidenceAdded }: Evidence
         </div>
       )}
 
-      {/* Admin Drag and Drop Upload Area */}
+      {/* Admin Upload Area / Selected File Staging */}
       {isAdmin && (
-        <div
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed flex flex-col items-center justify-center py-8 gap-2 transition-all cursor-pointer hover:border-cyan-500/50"
-          style={{
-            borderColor: dragActive ? C.cyan : C.border2,
-            background: dragActive ? `${C.cyan}08` : 'transparent',
-          }}
-        >
-          {uploading ? (
-            <div className="flex flex-col items-center gap-2">
-              <Loader2 size={20} className="animate-spin" style={{ color: C.cyan }} />
-              <div className="font-mono text-xs uppercase tracking-widest" style={{ color: C.cyan }}>
-                Uploading to secure storage...
+        selectedFile ? (
+          <div
+            className="border p-4 flex flex-col sm:flex-row items-center justify-between gap-4"
+            style={{ borderColor: C.cyan, background: `${C.cyan}06` }}
+          >
+            <div className="flex items-center gap-3 overflow-hidden w-full sm:w-auto">
+              {selectedPreviewUrl ? (
+                <img
+                  src={selectedPreviewUrl}
+                  alt="Selected Preview"
+                  className="w-16 h-16 object-cover border flex-shrink-0"
+                  style={{ borderColor: C.border }}
+                />
+              ) : (
+                <ImageIcon size={32} style={{ color: C.cyan }} />
+              )}
+              <div className="overflow-hidden">
+                <div className="font-mono text-xs truncate font-medium" style={{ color: C.text }} title={selectedFile.name}>
+                  {selectedFile.name}
+                </div>
+                <div className="font-mono text-[10px] mt-0.5" style={{ color: C.textDim }}>
+                  {formatBytes(selectedFile.size)} · Ready to upload
+                </div>
               </div>
             </div>
-          ) : (
-            <>
-              <Upload size={20} style={{ color: dragActive ? C.cyan : C.textDim }} />
-              <div className="font-mono text-xs uppercase tracking-widest" style={{ color: dragActive ? C.cyan : C.textSub }}>
-                Drop image here or click to browse
+
+            <div className="flex items-center gap-2 flex-shrink-0 w-full sm:w-auto justify-end">
+              <button
+                type="button"
+                onClick={clearSelectedFile}
+                disabled={uploading}
+                className="px-3 py-1.5 border font-mono text-[10px] uppercase tracking-widest transition-opacity hover:opacity-70 disabled:opacity-50"
+                style={{ borderColor: C.border2, color: C.textSub }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleFileUpload()}
+                disabled={uploading}
+                className="flex items-center gap-1.5 px-4 py-1.5 border font-mono text-[10px] uppercase tracking-widest transition-opacity hover:opacity-80 disabled:opacity-50"
+                style={{ borderColor: C.cyan, color: C.bg, background: C.cyan }}
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 size={12} className="animate-spin" /> Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload size={12} /> Upload Now
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className="border-2 border-dashed flex flex-col items-center justify-center py-8 gap-2.5 transition-all cursor-pointer hover:border-cyan-500/50"
+            style={{
+              borderColor: dragActive ? C.cyan : C.border2,
+              background: dragActive ? `${C.cyan}08` : 'transparent',
+            }}
+          >
+            {uploading ? (
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 size={20} className="animate-spin" style={{ color: C.cyan }} />
+                <div className="font-mono text-xs uppercase tracking-widest" style={{ color: C.cyan }}>
+                  Uploading to secure storage...
+                </div>
               </div>
-              <div className="font-mono text-[9px]" style={{ color: C.textDim }}>
-                Supported: JPEG, PNG, WebP · Maximum size: 10 MB
-              </div>
-            </>
-          )}
-        </div>
+            ) : (
+              <>
+                <Upload size={22} style={{ color: dragActive ? C.cyan : C.textDim }} />
+                <div className="font-mono text-xs uppercase tracking-widest" style={{ color: dragActive ? C.cyan : C.textSub }}>
+                  Drop image here or click to browse
+                </div>
+                <div className="font-mono text-[10px]" style={{ color: C.textDim }}>
+                  JPEG, PNG, or WebP images — max 10 MB per file
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
+                  className="mt-1 px-4 py-2 border font-mono text-xs uppercase tracking-widest transition-opacity hover:opacity-70"
+                  style={{
+                    borderColor: C.border2,
+                    color: C.cyan,
+                    background: `${C.cyan}0C`,
+                  }}
+                >
+                  Browse Files
+                </button>
+              </>
+            )}
+          </div>
+        )
       )}
 
       {/* Security notice */}
