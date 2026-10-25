@@ -128,6 +128,8 @@ class ApiError extends Error {
   }
 }
 
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+
 export interface RequestOptions extends RequestInit {
   auth?: boolean;
 }
@@ -146,7 +148,7 @@ async function request<T>(
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(`/api${path}`, { ...options, headers });
+  const response = await fetch(`${API_BASE}/api${path}`, { ...options, headers });
 
   // Successful 204 No Content responses
   if (response.status === 204) {
