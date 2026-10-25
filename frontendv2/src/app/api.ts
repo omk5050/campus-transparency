@@ -1009,6 +1009,249 @@ export async function getOrganizationTransparencyProfile(
   return request<OrganizationTransparencyProfile>(`/public/organizations/${id}/transparency${query}`);
 }
 
+// ─── Phase P4: Public Forum & Governance API ─────────────────────────────────
+
+export interface ForumPostSummary {
+  id: number;
+  organizationId: number;
+  organizationName: string;
+  authorAlias: string;
+  title: string;
+  snippet: string;
+  category: 'GENERAL' | 'SUGGESTION' | 'QUESTION' | 'DISCUSSION' | 'FEEDBACK';
+  status: 'PUBLISHED' | 'PENDING_REVIEW' | 'HIDDEN' | 'LOCKED' | 'DELETED';
+  replyCount: number;
+  createdAt: string;
+  updatedAt: string;
+  editedAt?: string | null;
+  locked: boolean;
+}
+
+export interface ForumPostDetail {
+  id: number;
+  organizationId: number;
+  organizationName: string;
+  authorAlias: string;
+  title: string;
+  content: string;
+  category: 'GENERAL' | 'SUGGESTION' | 'QUESTION' | 'DISCUSSION' | 'FEEDBACK';
+  status: 'PUBLISHED' | 'PENDING_REVIEW' | 'HIDDEN' | 'LOCKED' | 'DELETED';
+  replyCount: number;
+  createdAt: string;
+  updatedAt: string;
+  editedAt?: string | null;
+  locked: boolean;
+  canEdit: boolean;
+  moderatedAt?: string | null;
+  moderationReason?: string | null;
+}
+
+export interface ForumReply {
+  id: number;
+  postId: number;
+  authorAlias: string;
+  content: string;
+  status: 'PUBLISHED' | 'HIDDEN' | 'DELETED';
+  createdAt: string;
+  updatedAt: string;
+  editedAt?: string | null;
+  canEdit: boolean;
+}
+
+export interface ForumAuditLog {
+  id: number;
+  organizationId: number;
+  actor: string;
+  action: string;
+  targetType: string;
+  targetId: number;
+  reason?: string | null;
+  createdAt: string;
+}
+
+export interface ForumGovernanceStats {
+  totalPosts: number;
+  pendingReview: number;
+  published: number;
+  hidden: number;
+  locked: number;
+  replies: number;
+}
+
+// Public endpoints
+export async function getPublicForumPosts(params?: {
+  organizationId?: number;
+  category?: string;
+  search?: string;
+  page?: number;
+  size?: number;
+}): Promise<SpringPage<ForumPostSummary>> {
+  const query = buildQuery({
+    organizationId: params?.organizationId,
+    category: params?.category,
+    search: params?.search,
+    page: params?.page,
+    size: params?.size ?? 10,
+  });
+  return request<SpringPage<ForumPostSummary>>(`/public/forum${query}`);
+}
+
+export async function getPublicForumPost(postId: number): Promise<ForumPostDetail> {
+  return request<ForumPostDetail>(`/public/forum/${postId}`);
+}
+
+export async function getPublicForumReplies(postId: number): Promise<ForumReply[]> {
+  return request<ForumReply[]>(`/public/forum/${postId}/replies`);
+}
+
+// Authenticated user endpoints
+export async function getVisibleForumPosts(params?: {
+  category?: string;
+  search?: string;
+  page?: number;
+  size?: number;
+}): Promise<SpringPage<ForumPostSummary>> {
+  const query = buildQuery({
+    category: params?.category,
+    search: params?.search,
+    page: params?.page,
+    size: params?.size ?? 10,
+  });
+  return request<SpringPage<ForumPostSummary>>(`/forum/posts${query}`);
+}
+
+export async function getForumPostDetail(postId: number): Promise<ForumPostDetail> {
+  return request<ForumPostDetail>(`/forum/posts/${postId}`);
+}
+
+export async function createForumPost(data: {
+  title: string;
+  content: string;
+  category: string;
+}): Promise<ForumPostDetail> {
+  return request<ForumPostDetail>('/forum/posts', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateForumPost(
+  postId: number,
+  data: { title: string; content: string; category?: string }
+): Promise<ForumPostDetail> {
+  return request<ForumPostDetail>(`/forum/posts/${postId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteForumPost(postId: number): Promise<void> {
+  return request<void>(`/forum/posts/${postId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function getForumReplies(postId: number): Promise<ForumReply[]> {
+  return request<ForumReply[]>(`/forum/posts/${postId}/replies`);
+}
+
+export async function createForumReply(
+  postId: number,
+  data: { content: string }
+): Promise<ForumReply> {
+  return request<ForumReply>(`/forum/posts/${postId}/replies`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateForumReply(
+  replyId: number,
+  data: { content: string }
+): Promise<ForumReply> {
+  return request<ForumReply>(`/forum/replies/${replyId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteForumReply(replyId: number): Promise<void> {
+  return request<void>(`/forum/replies/${replyId}`, {
+    method: 'DELETE',
+  });
+}
+
+// Moderation endpoints (Admin & Super Admin)
+export async function getForumModerationQueue(params?: {
+  organizationId?: number;
+  status?: string;
+  category?: string;
+  search?: string;
+  page?: number;
+  size?: number;
+}): Promise<SpringPage<ForumPostSummary>> {
+  const query = buildQuery({
+    organizationId: params?.organizationId,
+    status: params?.status,
+    category: params?.category,
+    search: params?.search,
+    page: params?.page,
+    size: params?.size ?? 10,
+  });
+  return request<SpringPage<ForumPostSummary>>(`/admin/forum/moderation${query}`);
+}
+
+export async function publishForumPost(postId: number): Promise<ForumPostDetail> {
+  return request<ForumPostDetail>(`/admin/forum/posts/${postId}/publish`, {
+    method: 'POST',
+  });
+}
+
+export async function hideForumPost(postId: number, reason?: string): Promise<ForumPostDetail> {
+  return request<ForumPostDetail>(`/admin/forum/posts/${postId}/hide`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function lockForumPost(postId: number, reason?: string): Promise<ForumPostDetail> {
+  return request<ForumPostDetail>(`/admin/forum/posts/${postId}/lock`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function unlockForumPost(postId: number): Promise<ForumPostDetail> {
+  return request<ForumPostDetail>(`/admin/forum/posts/${postId}/unlock`, {
+    method: 'POST',
+  });
+}
+
+export async function hideForumReply(replyId: number, reason?: string): Promise<ForumReply> {
+  return request<ForumReply>(`/admin/forum/replies/${replyId}/hide`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function getSuperAdminForumGovernance(organizationId?: number): Promise<ForumGovernanceStats> {
+  const query = buildQuery({ organizationId });
+  return request<ForumGovernanceStats>(`/super-admin/forum/governance${query}`);
+}
+
+export async function getForumAuditLogs(params?: {
+  organizationId?: number;
+  page?: number;
+  size?: number;
+}): Promise<SpringPage<ForumAuditLog>> {
+  const query = buildQuery({
+    organizationId: params?.organizationId,
+    page: params?.page,
+    size: params?.size ?? 20,
+  });
+  return request<SpringPage<ForumAuditLog>>(`/admin/forum/audit${query}`);
+}
+
 // Re-export ApiError so callers can instanceof-check it
 export { ApiError };
 

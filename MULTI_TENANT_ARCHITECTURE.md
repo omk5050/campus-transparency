@@ -342,3 +342,54 @@ All transparency endpoints accept an optional `period` parameter (`ALL_TIME`, `L
 - `GET /api/public/organizations/{id}/transparency?period=`: Returns full aggregate profile for an institution including category and department breakdown.
 - `GET /api/admin/metrics?period=`: Authenticated tenant-scoped operational metrics for institutional administrators.
 
+---
+
+## 13. Phase P4 — Public Forum & Super Admin Governance
+
+### A. Critical Product Boundary: Absolute Decoupling
+The ETHOS Public Forum is completely decoupled from the Private Complaint Architecture:
+1. **Zero Data Leakage:**
+   - Forum posts never appear in complaint endpoints (`/api/issues/**`).
+   - Private complaints, complainant pseudonyms (`Complainant #XXXX`), tracking codes, internal notes, investigator assignments, and evidence attachments NEVER appear in forum endpoints (`/api/public/forum/**`, `/api/forum/**`).
+2. **Distinct Public Identities:**
+   - Complaint system uses `Complainant #XXXX` anonymous identity per complaint.
+   - Forum system uses `Member #XXXX` (salted cryptographic member alias). The pseudonym algorithm strictly isolates forum identities from complaint pseudonyms, usernames, and database primary keys.
+3. **No Automatic State Synchronization:**
+   - A forum post discussing an issue does NOT create a complaint ticket.
+   - A complaint ticket never spawns a public forum thread.
+
+### B. Forum Domain Models (Flyway `V14__add_public_forum.sql`)
+1. **`ForumPost`:**
+   - `id`, `organization_id`, `author_id`, `author_alias` (`Member #XXXX`)
+   - `title`, `content` (plain sanitized text)
+   - `category`: `GENERAL`, `SUGGESTION`, `QUESTION`, `DISCUSSION`, `FEEDBACK`
+   - `status`: `PUBLISHED`, `PENDING_REVIEW`, `HIDDEN`, `LOCKED`, `DELETED`
+   - Timestamps & moderation metadata (`moderated_at`, `moderated_by`, `moderation_reason`)
+2. **`ForumReply`:**
+   - `id`, `post_id`, `organization_id`, `author_id`, `author_alias`
+   - `content`, `status` (`PUBLISHED`, `HIDDEN`, `DELETED`)
+   - Strict organization constraint: Replies must belong to the exact same organization as their parent post.
+3. **`ForumAuditLog`:**
+   - Structured audit trails for every post/reply creation, edit, deletion, publication, hide, and lock action.
+   - Contains safe metadata: `organization_id`, `actor`, `action`, `target_type`, `target_id`, `reason`.
+
+### C. Tenant Scoping & Authorization Rules
+1. **Public Users:**
+   - Unauthenticated browsing of published discussions and replies across active institutions (`/api/public/forum/**`).
+2. **Authenticated Members (`STUDENT`, `INVESTIGATOR`, `ADMIN`):**
+   - Automatically scoped to their authenticated organization context (`user.organization_id`).
+   - Zero trust: Client cannot supply `organizationId` or `authorId`. Both are derived securely server-side.
+   - Cross-tenant creation, mutation, or replying is strictly rejected.
+3. **Institutional Administrators (`ADMIN`):**
+   - Moderation authority strictly bounded to their own organization's posts and replies.
+   - Moderation actions: `publish`, `hide`, `lock`, `unlock`, `delete` with mandatory audit logging and reason tracking.
+4. **Platform Governance (`SUPER_ADMIN`):**
+   - Multi-tenant moderation authority across all institutions.
+   - Cross-organization governance metrics: total posts, pending review, hidden, locked, and reply volumes.
+   - Platform-wide forum audit inspections.
+
+### D. Anti-Spam Rate Limiting (Bucket4j)
+- Forum post creations: Maximum 5 posts per hour per member.
+- Forum reply submissions: Maximum 20 replies per hour per member.
+- Rate-limit saturation raises `ForumRateLimitException`, translated cleanly into `HTTP 429 TOO_MANY_REQUESTS`.
+

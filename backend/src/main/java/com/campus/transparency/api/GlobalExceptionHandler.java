@@ -83,6 +83,12 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("IMAGE_STORAGE_ERROR", "Image storage operation failed: " + ex.getMessage());
     }
 
+    @ExceptionHandler(com.campus.transparency.application.forum.ForumRateLimitException.class)
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    public ErrorResponse handleForumRateLimitException(com.campus.transparency.application.forum.ForumRateLimitException ex) {
+        return new ErrorResponse("TOO_MANY_REQUESTS", ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ErrorResponse handleOther(Exception ex) {

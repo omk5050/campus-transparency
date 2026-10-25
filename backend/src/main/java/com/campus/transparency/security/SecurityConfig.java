@@ -72,6 +72,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/metrics").hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .requestMatchers("/api/super-admin/metrics").hasRole("SUPER_ADMIN")
 
+                        // Forum security rules
+                        .requestMatchers("/api/super-admin/forum", "/api/super-admin/forum/**").hasRole("SUPER_ADMIN")
+                        .requestMatchers("/api/admin/forum", "/api/admin/forum/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
+                        .requestMatchers("/api/forum", "/api/forum/**").authenticated()
+
                         // Require INVESTIGATOR, ADMIN or SUPER_ADMIN role for internal notes and investigator messages
                         .requestMatchers("/api/issues/*/internal-notes", "/api/issues/*/internal-notes/**").hasAnyRole("INVESTIGATOR", "ADMIN", "SUPER_ADMIN")
                         .requestMatchers("/api/issues/*/messages", "/api/issues/*/messages/**").hasAnyRole("INVESTIGATOR", "ADMIN", "SUPER_ADMIN")

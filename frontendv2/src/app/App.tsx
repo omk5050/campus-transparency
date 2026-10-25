@@ -56,6 +56,8 @@ import {
   Zap,
   Flag,
   Trophy,
+  MessageSquare,
+  ShieldAlert,
 } from "lucide-react";
 import {
   AreaChart,
@@ -125,6 +127,9 @@ import { SuperAdminApplications } from "./components/SuperAdminApplications";
 import { JoinCodeRegistration } from "./components/JoinCodeRegistration";
 import { JoinCodeManagement } from "./components/JoinCodeManagement";
 import { PublicTransparencyLeaderboard } from "./components/PublicTransparencyLeaderboard";
+import { PublicForum } from "./components/PublicForum";
+import { AdminForumModeration } from "./components/AdminForumModeration";
+import { SuperAdminForumGovernance } from "./components/SuperAdminForumGovernance";
 
 // ─── Design constants ──────────────────────────────────────────────────────────
 const C = {
@@ -991,7 +996,10 @@ type OrgView =
   | "PLATFORM"
   | "JOIN_CODES"
   | "ORG_APPLICATIONS"
-  | "LEADERBOARD";
+  | "LEADERBOARD"
+  | "FORUM"
+  | "FORUM_MODERATION"
+  | "FORUM_GOVERNANCE";
 
 const NAV_MAIN: {
   id: OrgView;
@@ -1060,6 +1068,7 @@ function OrgSidebar({
 
   if (isStudentRole) {
     roleNavItems.push(
+      { id: "FORUM", label: "Public Forum", icon: <MessageSquare size={15} /> },
       { id: "REPORTS", label: "My Complaints", icon: <FileText size={15} />, badge: unresolvedCount },
       { id: "SUBMIT", label: "Submit Complaint", icon: <Plus size={15} /> },
       { id: "TRACK", label: "Track a Report", icon: <Eye size={15} /> },
@@ -1067,6 +1076,7 @@ function OrgSidebar({
     );
   } else if (isInvestigatorRole) {
     roleNavItems.push(
+      { id: "FORUM", label: "Public Forum", icon: <MessageSquare size={15} /> },
       { id: "REPORTS", label: "Assigned Cases", icon: <FileText size={15} />, badge: unresolvedCount },
       { id: "TRACK", label: "Track a Report", icon: <Eye size={15} /> },
       { id: "LEADERBOARD", label: "Leaderboard & Stats", icon: <Trophy size={15} /> },
@@ -1074,6 +1084,8 @@ function OrgSidebar({
   } else if (isSuperAdminRole) {
     roleNavItems.push(
       { id: "PLATFORM", label: "Platform Overview", icon: <Terminal size={15} />, color: C.rose },
+      { id: "FORUM_GOVERNANCE", label: "Forum Governance", icon: <ShieldAlert size={15} />, color: C.rose },
+      { id: "FORUM", label: "Public Forum", icon: <MessageSquare size={15} /> },
       { id: "ORG_APPLICATIONS", label: "Org Applications", icon: <Building2 size={15} />, color: C.rose },
       { id: "JOIN_CODES", label: "Join Codes", icon: <Hash size={15} /> },
       { id: "OVERVIEW", label: "Org Overview", icon: <LayoutGrid size={15} /> },
@@ -1086,6 +1098,8 @@ function OrgSidebar({
     // Org Admin
     roleNavItems.push(
       { id: "OVERVIEW", label: "Overview", icon: <LayoutGrid size={15} /> },
+      { id: "FORUM_MODERATION", label: "Forum Moderation", icon: <Flag size={15} /> },
+      { id: "FORUM", label: "Public Forum", icon: <MessageSquare size={15} /> },
       { id: "ADMIN", label: "Case Management", icon: <Shield size={15} />, badge: unresolvedCount },
       { id: "REPORTS", label: "All Complaints", icon: <FileText size={15} /> },
       { id: "JOIN_CODES", label: "Join Codes", icon: <Hash size={15} /> },
@@ -4960,10 +4974,13 @@ function OrgSettingsView({ org }: { org: Organization }) {
 }
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
-type AppState = "LOGIN" | "REGISTER" | "APPLY" | "SPACES" | "JOIN" | "ORG" | "LEADERBOARD";
+type AppState = "LOGIN" | "REGISTER" | "APPLY" | "SPACES" | "JOIN" | "ORG" | "LEADERBOARD" | "FORUM";
 
 function parseInitialRoute(): { appState: AppState; orgView?: OrgView } {
   const path = window.location.pathname;
+  if (path === '/forum' || path.startsWith('/forum')) {
+    return { appState: 'FORUM' };
+  }
   if (path === '/leaderboard' || path === '/transparency') {
     return { appState: 'LEADERBOARD' };
   }
@@ -4979,6 +4996,12 @@ function parseInitialRoute(): { appState: AppState; orgView?: OrgView } {
   if (path === '/admin/join-codes') {
     return { appState: isAuthenticated() ? 'ORG' : 'LOGIN', orgView: 'JOIN_CODES' };
   }
+  if (path === '/admin/forum-moderation') {
+    return { appState: isAuthenticated() ? 'ORG' : 'LOGIN', orgView: 'FORUM_MODERATION' };
+  }
+  if (path === '/admin/forum-governance') {
+    return { appState: isAuthenticated() ? 'ORG' : 'LOGIN', orgView: 'FORUM_GOVERNANCE' };
+  }
   if (path === '/track') {
     return { appState: isAuthenticated() ? 'ORG' : 'LOGIN', orgView: 'TRACK' };
   }
@@ -4991,11 +5014,13 @@ function LoginView({
   onRegisterClick,
   onApplyClick,
   onLeaderboardClick,
+  onForumClick,
 }: {
   onSuccess: () => void;
   onRegisterClick: () => void;
   onApplyClick: () => void;
   onLeaderboardClick: () => void;
+  onForumClick: () => void;
 }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -5150,6 +5175,18 @@ function LoginView({
               <span>Explore Public Institutional Leaderboard</span>
             </div>
             <span className="text-[10px] uppercase font-bold tracking-wider">Rankings →</span>
+          </button>
+          <button
+            type="button"
+            onClick={onForumClick}
+            className="w-full text-left py-2 px-3 border transition-colors hover:bg-white/[0.03] flex items-center justify-between"
+            style={{ borderColor: `${C.cyan}30`, color: C.text }}
+          >
+            <div className="flex items-center gap-2">
+              <MessageSquare size={13} className="text-cyan-400" />
+              <span>Browse Public Community Forum</span>
+            </div>
+            <span className="text-[10px] uppercase font-bold tracking-wider text-cyan-400">Discussions →</span>
           </button>
           <button
             type="button"
@@ -5526,6 +5563,14 @@ export default function App() {
           onRegisterClick={() => navigateTo("/register", "REGISTER")}
           onApplyClick={() => navigateTo("/organization/apply", "APPLY")}
           onLeaderboardClick={() => navigateTo("/leaderboard", "LEADERBOARD")}
+          onForumClick={() => navigateTo("/forum", "FORUM")}
+        />
+      )}
+
+      {appState === "FORUM" && (
+        <PublicForum
+          onBack={() => navigateTo(isAuthenticated() ? "/" : "/login", isAuthenticated() ? "SPACES" : "LOGIN")}
+          isAdmin={isAdmin || isSuperAdmin}
         />
       )}
 
@@ -5703,6 +5748,23 @@ export default function App() {
               <PublicTransparencyLeaderboard
                 onBack={() => setOrgView("OVERVIEW")}
                 initialOrgId={Number(currentOrg.id)}
+              />
+            )}
+            {orgView === "FORUM" && (
+              <PublicForum
+                onBack={() => setOrgView("OVERVIEW")}
+                isAdmin={isAdmin || isSuperAdmin}
+              />
+            )}
+            {orgView === "FORUM_MODERATION" && (
+              <AdminForumModeration
+                onBack={() => setOrgView("OVERVIEW")}
+                isSuperAdmin={isSuperAdmin}
+              />
+            )}
+            {orgView === "FORUM_GOVERNANCE" && (
+              <SuperAdminForumGovernance
+                onBack={() => setOrgView("OVERVIEW")}
               />
             )}
           </main>

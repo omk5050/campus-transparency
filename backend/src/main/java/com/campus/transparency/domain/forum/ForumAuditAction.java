@@ -1,0 +1,15 @@
+package com.campus.transparency.domain.forum;
+
+public enum ForumAuditAction {
+    FORUM_POST_CREATED,
+    FORUM_POST_EDITED,
+    FORUM_POST_HIDDEN,
+    FORUM_POST_PUBLISHED,
+    FORUM_POST_LOCKED,
+    FORUM_POST_UNLOCKED,
+    FORUM_POST_DELETED,
+    FORUM_REPLY_CREATED,
+    FORUM_REPLY_EDITED,
+    FORUM_REPLY_HIDDEN,
+    FORUM_REPLY_DELETED
+}
