@@ -36,4 +36,9 @@ public interface IssueRepository extends JpaRepository<Issue, Long>, JpaSpecific
           and i.createdAt < :cutoff
     """)
     List<Issue> findUnresolvedOlderThan(Instant cutoff);
+
+    long countByOrganizationId(Long organizationId);
+    long countByOrganizationIdAndStatus(Long organizationId, IssueStatus status);
+    long countByOrganizationIdAndAssignedToIsNotNull(Long organizationId);
+    long countByOrganizationIdAndAssignedToIsNull(Long organizationId);
 }

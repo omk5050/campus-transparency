@@ -12,7 +12,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/issues/{issueId}/internal-notes")
-@PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+@PreAuthorize("hasAnyRole('INVESTIGATOR', 'ADMIN', 'SUPER_ADMIN')")
 public class InternalNoteController {
 
     private final InternalNoteService noteService;

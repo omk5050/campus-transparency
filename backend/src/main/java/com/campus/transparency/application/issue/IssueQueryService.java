@@ -12,6 +12,13 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import com.campus.transparency.api.issue.OrganizationMetricsResponse;
+import com.campus.transparency.api.issue.PlatformMetricsResponse;
+import com.campus.transparency.domain.organization.ApplicationStatus;
+import com.campus.transparency.domain.organization.OrganizationApplicationRepository;
+import com.campus.transparency.domain.organization.OrganizationRepository;
+import com.campus.transparency.domain.organization.OrganizationStatus;
+import com.campus.transparency.domain.user.User;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -22,15 +29,21 @@ public class IssueQueryService {
 
     private final IssueRepository issueRepository;
     private final UserRepository userRepository;
+    private final OrganizationRepository organizationRepository;
+    private final OrganizationApplicationRepository organizationApplicationRepository;
     private final CurrentUserService currentUserService;
 
     public IssueQueryService(
             IssueRepository issueRepository,
             UserRepository userRepository,
+            OrganizationRepository organizationRepository,
+            OrganizationApplicationRepository organizationApplicationRepository,
             CurrentUserService currentUserService
     ) {
         this.issueRepository = issueRepository;
         this.userRepository = userRepository;
+        this.organizationRepository = organizationRepository;
+        this.organizationApplicationRepository = organizationApplicationRepository;
         this.currentUserService = currentUserService;
     }
 
@@ -124,14 +137,33 @@ public class IssueQueryService {
 
     @Transactional(readOnly = true)
     public List<AssignedUserResponse> getAssignableUsers(Long organizationId) {
+        List<Role> assignableRoles = List.of(Role.ADMIN, Role.INVESTIGATOR);
         if (organizationId == null) {
-            return userRepository.findByRole(Role.ADMIN).stream()
+            return userRepository.findByRoleIn(assignableRoles).stream()
                     .map(AssignedUserResponse::from)
                     .toList();
         }
-        return userRepository.findByRoleAndOrganizationId(Role.ADMIN, organizationId).stream()
+        return userRepository.findByRoleInAndOrganizationId(assignableRoles, organizationId).stream()
                 .map(AssignedUserResponse::from)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Issue> getMyComplaints(Pageable pageable) {
+        User currentUser = currentUserService.getCurrentUser();
+        Long orgId = currentUser.getOrganization() != null ? currentUser.getOrganization().getId() : null;
+        Specification<Issue> spec = Specification.where(IssueSpecification.belongsToOrganization(orgId))
+                .and(IssueSpecification.reportedByUser(currentUser.getId()));
+        return issueRepository.findAll(spec, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Issue> getAssignedComplaints(Pageable pageable) {
+        User currentUser = currentUserService.getCurrentUser();
+        Long orgId = currentUser.getOrganization() != null ? currentUser.getOrganization().getId() : null;
+        Specification<Issue> spec = Specification.where(IssueSpecification.belongsToOrganization(orgId))
+                .and(IssueSpecification.assignedToUser(currentUser.getId()));
+        return issueRepository.findAll(spec, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -152,7 +184,41 @@ public class IssueQueryService {
         if (organizationId != null && (issue.getOrganization() == null || !issue.getOrganization().getId().equals(organizationId))) {
             throw new jakarta.persistence.EntityNotFoundException("Issue not found with id: " + id);
         }
+        try {
+            User currentUser = currentUserService.getCurrentUser();
+            if (currentUser != null && currentUser.getRole() == Role.STUDENT) {
+                if (issue.getReporter() == null || !issue.getReporter().getId().equals(currentUser.getId())) {
+                    throw new jakarta.persistence.EntityNotFoundException("Issue not found with id: " + id);
+                }
+            }
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            throw e;
+        } catch (Exception ignored) {
+        }
         return issue;
+    }
+
+    @Transactional(readOnly = true)
+    public OrganizationMetricsResponse getOrganizationMetrics() {
+        Long orgId = currentUserService.getCurrentOrganizationId();
+        long total = issueRepository.countByOrganizationId(orgId);
+        long reported = issueRepository.countByOrganizationIdAndStatus(orgId, IssueStatus.REPORTED);
+        long inProgress = issueRepository.countByOrganizationIdAndStatus(orgId, IssueStatus.IN_PROGRESS);
+        long resolved = issueRepository.countByOrganizationIdAndStatus(orgId, IssueStatus.RESOLVED);
+        long rejected = issueRepository.countByOrganizationIdAndStatus(orgId, IssueStatus.REJECTED);
+        long assigned = issueRepository.countByOrganizationIdAndAssignedToIsNotNull(orgId);
+        long unassigned = issueRepository.countByOrganizationIdAndAssignedToIsNull(orgId);
+        return new OrganizationMetricsResponse(total, reported, inProgress, resolved, rejected, assigned, unassigned);
+    }
+
+    @Transactional(readOnly = true)
+    public PlatformMetricsResponse getPlatformMetrics() {
+        long totalOrgs = organizationRepository.count();
+        long activeOrgs = organizationRepository.countByStatus(OrganizationStatus.ACTIVE);
+        long suspendedOrgs = organizationRepository.countByStatus(OrganizationStatus.SUSPENDED);
+        long pendingApps = organizationApplicationRepository.countByStatus(ApplicationStatus.PENDING);
+        long totalComplaints = issueRepository.count();
+        return new PlatformMetricsResponse(totalOrgs, activeOrgs, suspendedOrgs, pendingApps, totalComplaints);
     }
 
     @Transactional(readOnly = true)

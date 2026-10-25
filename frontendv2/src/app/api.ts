@@ -196,6 +196,27 @@ export function logout(): void {
   clearToken();
 }
 
+export interface UserProfile {
+  id: number;
+  username: string;
+  role: 'STUDENT' | 'INVESTIGATOR' | 'ADMIN' | 'SUPER_ADMIN';
+  organization?: {
+    id: number;
+    name: string;
+    type: string;
+  } | null;
+}
+
+export type UserProfileResponse = UserProfile;
+
+/**
+ * GET /api/auth/me
+ * Retrieves current authenticated user profile and tenant affiliation.
+ */
+export async function getCurrentUser(): Promise<UserProfile> {
+  return request<UserProfile>('/auth/me');
+}
+
 // ─── Issues ───────────────────────────────────────────────────────────────────
 
 export interface FeedParams {
@@ -242,6 +263,30 @@ export async function getAdminFeed(
   const { status, department, assignedTo, unassigned, startDate, endDate, page = 0, size = 100, sort = 'createdAt,desc' } = params;
   const query = buildQuery({ status, department, assignedTo, unassigned, startDate, endDate, page, size, sort });
   return request<SpringPage<BackendIssueResponse>>(`/issues/admin${query}`);
+}
+
+/**
+ * GET /api/issues/my
+ * Student complaints feed — isolated strictly to student's own submissions.
+ */
+export async function getMyComplaints(
+  params: { page?: number; size?: number } = {},
+): Promise<SpringPage<BackendIssueResponse>> {
+  const { page = 0, size = 50 } = params;
+  const query = buildQuery({ page, size, sort: 'createdAt,desc' });
+  return request<SpringPage<BackendIssueResponse>>(`/issues/my${query}`);
+}
+
+/**
+ * GET /api/issues/assigned
+ * Investigator workspace feed — isolated to cases assigned to current investigator.
+ */
+export async function getAssignedComplaints(
+  params: { page?: number; size?: number } = {},
+): Promise<SpringPage<BackendIssueResponse>> {
+  const { page = 0, size = 50 } = params;
+  const query = buildQuery({ page, size, sort: 'createdAt,desc' });
+  return request<SpringPage<BackendIssueResponse>>(`/issues/assigned${query}`);
 }
 
 /**
@@ -533,7 +578,35 @@ export async function rejectOrganizationApplication(
 
 // ─── Organization Join Codes ──────────────────────────────────────────────────
 
-export type TargetRole = 'STUDENT' | 'ADMIN';
+export type TargetRole = 'STUDENT' | 'INVESTIGATOR' | 'ADMIN' | 'SUPER_ADMIN';
+
+export interface OrganizationMetrics {
+  totalComplaints: number;
+  reportedComplaints: number;
+  inProgressComplaints: number;
+  resolvedComplaints: number;
+  rejectedComplaints: number;
+  assignedCases: number;
+  unassignedCases: number;
+}
+
+export interface PlatformMetrics {
+  totalOrganizations: number;
+  activeOrganizations: number;
+  suspendedOrganizations: number;
+  pendingApplications: number;
+  totalComplaints: number;
+}
+
+/** GET /api/admin/metrics — Tenant-scoped operational metrics */
+export async function getOrganizationMetrics(): Promise<OrganizationMetrics> {
+  return request<OrganizationMetrics>('/admin/metrics');
+}
+
+/** GET /api/super-admin/metrics — Platform-level metrics */
+export async function getPlatformMetrics(): Promise<PlatformMetrics> {
+  return request<PlatformMetrics>('/super-admin/metrics');
+}
 
 export interface CreateJoinCodeRequest {
   targetRole: TargetRole;
@@ -638,10 +711,6 @@ export async function registerWithJoinCode(
   return data.token;
 }
 
-/** GET /api/auth/me — Retrieve authenticated user profile and tenant binding */
-export async function getCurrentUser(): Promise<UserProfileResponse> {
-  return request<UserProfileResponse>('/auth/me');
-}
 
 // ─── Internal Notes ───────────────────────────────────────────────────────────
 

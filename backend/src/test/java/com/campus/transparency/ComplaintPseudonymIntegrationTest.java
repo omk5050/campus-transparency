@@ -18,11 +18,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -58,32 +58,48 @@ public class ComplaintPseudonymIntegrationTest {
     @Autowired
     private IssueRepository issueRepository;
 
-    private Organization testOrg;
-    private User testStudent;
-    private User testAdmin;
+    private Organization testOrgA;
+    private Organization testOrgB;
+    private User testStudentA;
+    private User testAdminA;
+    private User testAdminB;
 
     @BeforeEach
     void setUp() {
         String runSuffix = String.valueOf(System.currentTimeMillis() % 100000);
-        testOrg = organizationRepository.save(new Organization(
-                "Pseudonym Test College " + runSuffix,
+        testOrgA = organizationRepository.save(new Organization(
+                "Pseudonym Test College A " + runSuffix,
                 OrganizationType.COLLEGE,
                 OrganizationStatus.ACTIVE,
-                "contact" + runSuffix + "@pseudo.edu"
+                "contactA" + runSuffix + "@pseudo.edu"
         ));
 
-        testStudent = userRepository.save(new User(
-                "pseudo_student_" + runSuffix,
+        testOrgB = organizationRepository.save(new Organization(
+                "Pseudonym Test College B " + runSuffix,
+                OrganizationType.COLLEGE,
+                OrganizationStatus.ACTIVE,
+                "contactB" + runSuffix + "@pseudo.edu"
+        ));
+
+        testStudentA = userRepository.save(new User(
+                "pseudo_student_a_" + runSuffix,
                 "$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi",
                 Role.STUDENT,
-                testOrg
+                testOrgA
         ));
 
-        testAdmin = userRepository.save(new User(
-                "pseudo_admin_" + runSuffix,
+        testAdminA = userRepository.save(new User(
+                "pseudo_admin_a_" + runSuffix,
                 "$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi",
                 Role.ADMIN,
-                testOrg
+                testOrgA
+        ));
+
+        testAdminB = userRepository.save(new User(
+                "pseudo_admin_b_" + runSuffix,
+                "$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi",
+                Role.ADMIN,
+                testOrgB
         ));
     }
 
@@ -100,7 +116,7 @@ public class ComplaintPseudonymIntegrationTest {
         );
 
         MvcResult result = mockMvc.perform(post("/api/issues")
-                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testStudent.getUsername()).roles("STUDENT"))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testStudentA.getUsername()).roles("STUDENT"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -135,14 +151,14 @@ public class ComplaintPseudonymIntegrationTest {
         );
 
         MvcResult res1 = mockMvc.perform(post("/api/issues")
-                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testStudent.getUsername()).roles("STUDENT"))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testStudentA.getUsername()).roles("STUDENT"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req1)))
                 .andExpect(status().isCreated())
                 .andReturn();
 
         MvcResult res2 = mockMvc.perform(post("/api/issues")
-                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testStudent.getUsername()).roles("STUDENT"))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testStudentA.getUsername()).roles("STUDENT"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req2)))
                 .andExpect(status().isCreated())
@@ -186,14 +202,14 @@ public class ComplaintPseudonymIntegrationTest {
         );
 
         MvcResult res1 = mockMvc.perform(post("/api/issues")
-                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testStudent.getUsername()).roles("STUDENT"))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testStudentA.getUsername()).roles("STUDENT"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req1)))
                 .andExpect(status().isCreated())
                 .andReturn();
 
         MvcResult res2 = mockMvc.perform(post("/api/issues")
-                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testStudent.getUsername()).roles("STUDENT"))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testStudentA.getUsername()).roles("STUDENT"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req2)))
                 .andExpect(status().isCreated())
@@ -209,8 +225,8 @@ public class ComplaintPseudonymIntegrationTest {
 
     @Test
     @Order(4)
-    @DisplayName("4. Public feed and Admin feed consistently expose the complaint-specific pseudonym without leakage")
-    void test4_publicFeedAndAdminFeedExposeConsistentReporterAlias() throws Exception {
+    @DisplayName("4. Authenticated feed exposes reporterAlias; Public tracking strictly omits it")
+    void test4_authenticatedFeedExposesAliasWhilePublicTrackingOmitsIt() throws Exception {
         CreateIssueRequest request = new CreateIssueRequest(
                 "Broken Projector in Hall B",
                 "Lamp burned out during lecture",
@@ -220,7 +236,7 @@ public class ComplaintPseudonymIntegrationTest {
         );
 
         MvcResult createResult = mockMvc.perform(post("/api/issues")
-                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testStudent.getUsername()).roles("STUDENT"))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testStudentA.getUsername()).roles("STUDENT"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -231,38 +247,169 @@ public class ComplaintPseudonymIntegrationTest {
         String expectedAlias = createdJson.get("reporterAlias").asText();
         String trackingCode = createdJson.get("trackingCode").asText();
 
-        // Check student public feed
+        // Check student authenticated feed
         mockMvc.perform(get("/api/issues/{id}", issueId)
-                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testStudent.getUsername()).roles("STUDENT")))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testStudentA.getUsername()).roles("STUDENT")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reporterAlias").value(expectedAlias))
                 .andExpect(jsonPath("$.reporterHash").doesNotExist());
 
-        // Check admin feed
+        // Check admin authenticated feed
         mockMvc.perform(get("/api/issues/{id}", issueId)
-                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testAdmin.getUsername()).roles("ADMIN")))
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testAdminA.getUsername()).roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reporterAlias").value(expectedAlias))
                 .andExpect(jsonPath("$.reporterHash").doesNotExist());
 
-        // Check public tracking
+        // Check public tracking: MUST NOT expose reporterAlias, reporterHash, or internal details
         mockMvc.perform(get("/api/issues/track/{trackingCode}", trackingCode))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.reporterAlias").value(expectedAlias))
-                .andExpect(jsonPath("$.reporterHash").doesNotExist());
+                .andExpect(jsonPath("$.trackingCode").value(trackingCode))
+                .andExpect(jsonPath("$.reporterAlias").doesNotExist())
+                .andExpect(jsonPath("$.reporterHash").doesNotExist())
+                .andExpect(jsonPath("$.assignedTo").doesNotExist());
     }
 
     @Test
     @Order(5)
-    @DisplayName("5. AnonymousTagService contract generates high-entropy 'Complainant #XXXX' pseudonyms")
-    void test5_anonymousTagServiceEntropy() {
+    @DisplayName("5. Aliases contain no user identifier, username, email, or database ID")
+    void test5_aliasesContainNoAccountIdentifier() throws Exception {
+        CreateIssueRequest request = new CreateIssueRequest(
+                "Elevator 3 Out of Service",
+                "Buttons do not register floor selection",
+                null,
+                "Infrastructure",
+                "Facilities"
+        );
+
+        MvcResult result = mockMvc.perform(post("/api/issues")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testStudentA.getUsername()).roles("STUDENT"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String alias = objectMapper.readTree(result.getResponse().getContentAsString()).get("reporterAlias").asText();
+        assertThat(alias).doesNotContain(testStudentA.getUsername());
+        assertThat(alias).doesNotContain(String.valueOf(testStudentA.getId()));
+        assertThat(alias).doesNotContain("pseudo");
+        assertThat(alias).matches(COMPLAINANT_PATTERN);
+    }
+
+    @Test
+    @Order(6)
+    @DisplayName("6. Client cannot select or override the complaint alias in the payload")
+    void test6_clientCannotSelectOrOverrideAlias() throws Exception {
+        Map<String, Object> maliciousPayload = Map.of(
+                "title", "Spoofed Alias Test",
+                "description", "Attempting to force custom alias",
+                "reporterAlias", "Complainant #HACK",
+                "category", "Security",
+                "department", "IT Services"
+        );
+
+        MvcResult result = mockMvc.perform(post("/api/issues")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testStudentA.getUsername()).roles("STUDENT"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(maliciousPayload)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String alias = objectMapper.readTree(result.getResponse().getContentAsString()).get("reporterAlias").asText();
+        assertThat(alias).isNotEqualTo("Complainant #HACK");
+        assertThat(alias).matches(COMPLAINANT_PATTERN);
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("7. Public issue feed requires authentication (complaints are NOT publicly browsable)")
+    void test7_publicFeedRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/issues"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @Order(8)
+    @DisplayName("8. Tracking endpoint exposes only safe tracking information and prevents data leakage")
+    void test8_trackingEndpointExposesOnlySafeTrackingInformation() throws Exception {
+        CreateIssueRequest request = new CreateIssueRequest(
+                "Heating Failure in Dormitory",
+                "No heat in Room 302",
+                null,
+                "HVAC",
+                "Facilities"
+        );
+
+        MvcResult result = mockMvc.perform(post("/api/issues")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testStudentA.getUsername()).roles("STUDENT"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        JsonNode created = objectMapper.readTree(result.getResponse().getContentAsString());
+        String trackingCode = created.get("trackingCode").asText();
+
+        // Query tracking endpoint unauthenticated
+        MvcResult trackResult = mockMvc.perform(get("/api/issues/track/{trackingCode}", trackingCode))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode trackJson = objectMapper.readTree(trackResult.getResponse().getContentAsString());
+
+        // Verify safe fields ARE present
+        assertThat(trackJson.get("trackingCode").asText()).isEqualTo(trackingCode);
+        assertThat(trackJson.get("title").asText()).isEqualTo("Heating Failure in Dormitory");
+        assertThat(trackJson.get("description").asText()).isEqualTo("No heat in Room 302");
+        assertThat(trackJson.get("status").asText()).isEqualTo("REPORTED");
+
+        // Verify sensitive fields are strictly ABSENT
+        assertThat(trackJson.has("reporterAlias")).isFalse();
+        assertThat(trackJson.has("reporterHash")).isFalse();
+        assertThat(trackJson.has("assignedTo")).isFalse();
+        assertThat(trackJson.has("organization")).isFalse();
+        assertThat(trackJson.has("internalNotes")).isFalse();
+        assertThat(trackJson.has("messages")).isFalse();
+        assertThat(trackJson.has("auditLogs")).isFalse();
+    }
+
+    @Test
+    @Order(9)
+    @DisplayName("9. Cross-tenant issue access remains strictly denied (returns 404)")
+    void test9_crossTenantIssueAccessDenied() throws Exception {
+        CreateIssueRequest request = new CreateIssueRequest(
+                "Org A Confidential Signal",
+                "Internal lab safety issue",
+                null,
+                "Safety",
+                "Facilities"
+        );
+
+        MvcResult result = mockMvc.perform(post("/api/issues")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testStudentA.getUsername()).roles("STUDENT"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        Long orgAIssueId = objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
+
+        // Org B Admin attempts to access Org A issue -> returns 404 NOT_FOUND (anti-enumeration)
+        mockMvc.perform(get("/api/issues/{id}", orgAIssueId)
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(testAdminB.getUsername()).roles("ADMIN")))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @Order(10)
+    @DisplayName("10. AnonymousTagService contract generates high-entropy 'Complainant #XXXX' pseudonyms")
+    void test10_anonymousTagServiceEntropy() {
         Set<String> generated = new HashSet<>();
         for (int i = 0; i < 100; i++) {
             String pseudonym = AnonymousTagService.generateComplaintPseudonym();
             assertThat(pseudonym).matches(COMPLAINANT_PATTERN);
             generated.add(pseudonym);
         }
-        // With 65,536 combinations, 100 samples should have > 95 unique values
         assertThat(generated.size()).isGreaterThanOrEqualTo(95);
     }
 }

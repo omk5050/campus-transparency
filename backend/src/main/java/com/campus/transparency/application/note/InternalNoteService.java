@@ -146,7 +146,7 @@ public class InternalNoteService {
     }
 
     private void verifyCaseManagementPermission(Issue issue, User currentUser) {
-        if (currentUser.getRole() != Role.ADMIN && currentUser.getRole() != Role.SUPER_ADMIN) {
+        if (currentUser.getRole() != Role.ADMIN && currentUser.getRole() != Role.SUPER_ADMIN && currentUser.getRole() != Role.INVESTIGATOR) {
             throw new AccessDeniedException("Ordinary members/students cannot access internal case management features");
         }
     }

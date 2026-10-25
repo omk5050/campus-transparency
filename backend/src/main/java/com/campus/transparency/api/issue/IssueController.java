@@ -62,31 +62,31 @@ public class IssueController {
 
     @PostMapping("/{id}/start")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTIGATOR')")
     public void startProgress(@PathVariable Long id) {
-        log.info("Admin starting progress on issue {}", id);
+        log.info("Starting progress on issue {}", id);
         commandService.startProgress(id);
     }
 
     @PostMapping("/{id}/resolve")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTIGATOR')")
     public void resolve(@PathVariable Long id) {
-        log.info("Admin resolving issue {}", id);
+        log.info("Resolving issue {}", id);
         commandService.resolve(id);
     }
 
     @PostMapping("/{id}/reject")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTIGATOR')")
     public void reject(@PathVariable Long id) {
-        log.info("Admin rejecting issue {}", id);
+        log.info("Rejecting issue {}", id);
         commandService.reject(id);
     }
 
     @PostMapping("/{id}/hide")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public void hide(@PathVariable Long id) {
         log.info("Admin hiding issue {}", id);
         commandService.hide(id);
@@ -94,14 +94,14 @@ public class IssueController {
 
     @PostMapping("/{id}/unhide")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public void unhide(@PathVariable Long id) {
         log.info("Admin unhiding issue {}", id);
         commandService.unhide(id);
     }
 
     @PostMapping("/{id}/assign")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public IssueResponse assign(
             @PathVariable Long id,
             @Valid @RequestBody AssignIssueRequest request,
@@ -114,7 +114,7 @@ public class IssueController {
     }
 
     @PostMapping("/{id}/unassign")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public IssueResponse unassign(
             @PathVariable Long id,
             java.security.Principal principal
@@ -183,14 +183,34 @@ public class IssueController {
                 .map(IssueResponse::from);
     }
 
+    @GetMapping("/my")
+    @PreAuthorize("hasRole('STUDENT')")
+    public Page<IssueResponse> myComplaints(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return queryService.getMyComplaints(PageRequest.of(page, size))
+                .map(IssueResponse::from);
+    }
+
+    @GetMapping("/assigned")
+    @PreAuthorize("hasAnyRole('INVESTIGATOR', 'ADMIN')")
+    public Page<IssueResponse> assignedComplaints(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return queryService.getAssignedComplaints(PageRequest.of(page, size))
+                .map(IssueResponse::from);
+    }
+
     @GetMapping("/assignees")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public java.util.List<AssignedUserResponse> getAssignees() {
         return queryService.getAssignableUsers();
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'INVESTIGATOR', 'ADMIN', 'SUPER_ADMIN')")
     public IssueResponse getById(@PathVariable Long id) {
         Issue issue = queryService.getById(id);
         return IssueResponse.from(issue);

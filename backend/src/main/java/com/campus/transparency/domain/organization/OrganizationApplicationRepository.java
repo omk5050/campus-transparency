@@ -17,4 +17,6 @@ public interface OrganizationApplicationRepository extends JpaRepository<Organiz
     boolean existsByRequestedAdminUsernameIgnoreCaseAndStatus(String requestedAdminUsername, ApplicationStatus status);
 
     Page<OrganizationApplication> findByStatus(ApplicationStatus status, Pageable pageable);
+
+    long countByStatus(ApplicationStatus status);
 }

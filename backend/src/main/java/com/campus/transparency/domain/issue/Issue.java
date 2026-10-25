@@ -49,6 +49,10 @@ public class Issue extends BaseEntity {
     private User assignedTo;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reporter_id")
+    private User reporter;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organization_id", nullable = false)
     private com.campus.transparency.domain.organization.Organization organization;
 
@@ -65,10 +69,14 @@ public class Issue extends BaseEntity {
     }
 
     public Issue(String title, String description, String reporterHash, String category, String department, com.campus.transparency.domain.organization.Organization organization) {
-        this(title, description, reporterHash, category, department, organization, null);
+        this(title, description, reporterHash, category, department, organization, null, null);
     }
 
     public Issue(String title, String description, String reporterHash, String category, String department, com.campus.transparency.domain.organization.Organization organization, String reporterAlias) {
+        this(title, description, reporterHash, category, department, organization, reporterAlias, null);
+    }
+
+    public Issue(String title, String description, String reporterHash, String category, String department, com.campus.transparency.domain.organization.Organization organization, String reporterAlias, User reporter) {
         this.title = title;
         this.description = description;
         this.reporterHash = (reporterHash != null && !reporterHash.isBlank())
@@ -82,6 +90,7 @@ public class Issue extends BaseEntity {
         this.reporterAlias = (reporterAlias != null && !reporterAlias.isBlank())
                 ? reporterAlias
                 : AnonymousTagService.generateComplaintPseudonym();
+        this.reporter = reporter;
     }
 
     //---DOMAIN-ENFORCED LIFECYCLE---
@@ -176,6 +185,14 @@ public class Issue extends BaseEntity {
 
     public User getAssignedTo() {
         return assignedTo;
+    }
+
+    public User getReporter() {
+        return reporter;
+    }
+
+    public void setReporter(User reporter) {
+        this.reporter = reporter;
     }
 
     public com.campus.transparency.domain.organization.Organization getOrganization() {

@@ -141,10 +141,10 @@ public class TenantIsolationIntegrationTest {
         }
 
         // 5. Create test issues for Org A and Org B
-        issueOrgA = new Issue("Org A Campus Heating", "Heating broken in Org A building", "hash_a", "Infrastructure", "Facilities & Operations", defaultOrgA);
+        issueOrgA = new Issue("Org A Campus Heating", "Heating broken in Org A building", "hash_a", "Infrastructure", "Facilities & Operations", defaultOrgA, null, studentA);
         issueOrgA = issueRepository.save(issueOrgA);
 
-        issueOrgB = new Issue("Org B Library Acoustics", "Noise complaints in Org B library", "hash_b", "Academic Affairs", "Library Services", orgB);
+        issueOrgB = new Issue("Org B Library Acoustics", "Noise complaints in Org B library", "hash_b", "Academic Affairs", "Library Services", orgB, null, studentB);
         issueOrgB = issueRepository.save(issueOrgB);
     }
 

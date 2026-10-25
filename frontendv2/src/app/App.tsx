@@ -90,6 +90,10 @@ import {
   hideIssue,
   getCurrentUser,
   getUnreadNotificationCount,
+  getMyComplaints,
+  getAssignedComplaints,
+  getOrganizationMetrics,
+  OrganizationMetrics,
   UserProfileResponse,
   ApiError,
 } from "./api";
@@ -1029,6 +1033,7 @@ function OrgSidebar({
   unreadNotifications,
   onSearch,
   isSuperAdmin,
+  userRole,
 }: {
   org: Organization;
   allOrgs: Organization[];
@@ -1040,9 +1045,49 @@ function OrgSidebar({
   unreadNotifications: number;
   onSearch: () => void;
   isSuperAdmin?: boolean;
+  userRole?: 'STUDENT' | 'INVESTIGATOR' | 'ADMIN' | 'SUPER_ADMIN';
 }) {
   const [orgOpen, setOrgOpen] = useState(false);
-  const isAdmin = isSuperAdmin || org.role === "ADMIN" || org.role === "OWNER";
+  const isSuperAdminRole = userRole === "SUPER_ADMIN" || isSuperAdmin;
+  const isOrgAdminRole = userRole === "ADMIN" || org.role === "ADMIN" || org.role === "OWNER";
+  const isInvestigatorRole = userRole === "INVESTIGATOR";
+  const isStudentRole = userRole === "STUDENT" || (!isSuperAdminRole && !isOrgAdminRole && !isInvestigatorRole);
+
+  const roleNavItems: { id: OrgView; label: string; icon: React.ReactNode; badge?: number; color?: string }[] = [];
+
+  if (isStudentRole) {
+    roleNavItems.push(
+      { id: "REPORTS", label: "My Complaints", icon: <FileText size={15} />, badge: unresolvedCount },
+      { id: "SUBMIT", label: "Submit Complaint", icon: <Plus size={15} /> },
+      { id: "TRACK", label: "Track a Report", icon: <Eye size={15} /> },
+    );
+  } else if (isInvestigatorRole) {
+    roleNavItems.push(
+      { id: "REPORTS", label: "Assigned Cases", icon: <FileText size={15} />, badge: unresolvedCount },
+      { id: "TRACK", label: "Track a Report", icon: <Eye size={15} /> },
+    );
+  } else if (isSuperAdminRole) {
+    roleNavItems.push(
+      { id: "PLATFORM", label: "Platform Overview", icon: <Terminal size={15} />, color: C.rose },
+      { id: "ORG_APPLICATIONS", label: "Org Applications", icon: <Building2 size={15} />, color: C.rose },
+      { id: "JOIN_CODES", label: "Join Codes", icon: <Hash size={15} /> },
+      { id: "OVERVIEW", label: "Org Overview", icon: <LayoutGrid size={15} /> },
+      { id: "ADMIN", label: "Case Management", icon: <Shield size={15} />, badge: unresolvedCount },
+      { id: "REPORTS", label: "All Complaints", icon: <FileText size={15} /> },
+      { id: "TRACK", label: "Track a Report", icon: <Eye size={15} /> },
+    );
+  } else {
+    // Org Admin
+    roleNavItems.push(
+      { id: "OVERVIEW", label: "Overview", icon: <LayoutGrid size={15} /> },
+      { id: "ADMIN", label: "Case Management", icon: <Shield size={15} />, badge: unresolvedCount },
+      { id: "REPORTS", label: "All Complaints", icon: <FileText size={15} /> },
+      { id: "JOIN_CODES", label: "Join Codes", icon: <Hash size={15} /> },
+      { id: "SETTINGS", label: "Org Settings", icon: <Settings size={15} /> },
+      { id: "MODERATION", label: "Moderation Queue", icon: <Flag size={15} /> },
+      { id: "TRACK", label: "Track a Report", icon: <Eye size={15} /> },
+    );
+  }
 
   return (
     <aside
@@ -1100,9 +1145,9 @@ function OrgSidebar({
             </div>
             <div
               className="font-mono text-[10px] uppercase tracking-widest"
-              style={{ color: C.textDim }}
+              style={{ color: C.cyan }}
             >
-              {org.role}
+              {userRole ?? org.role}
             </div>
           </div>
           <ChevronDown
@@ -1175,199 +1220,59 @@ function OrgSidebar({
         )}
       </div>
 
-      {/* Main nav */}
+      {/* Main role-based nav */}
       <nav className="flex-1 py-4 space-y-px">
         <div className="px-5 mb-2">
           <span
             className="font-mono text-[9px] uppercase tracking-[0.2em]"
             style={{ color: C.textDim }}
           >
-            Navigation
+            {userRole ? `${userRole} Console` : "Navigation"}
           </span>
         </div>
-        {NAV_MAIN.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => onView(item.id)}
-            className="w-full flex items-center gap-3 px-5 py-2.5 transition-colors text-left relative"
-            style={{
-              color: view === item.id ? C.cyan : C.textSub,
-              background:
-                view === item.id
-                  ? `${C.cyan}08`
-                  : "transparent",
-            }}
-            onMouseEnter={(e) => {
-              if (view !== item.id)
-                e.currentTarget.style.color = C.text;
-            }}
-            onMouseLeave={(e) => {
-              if (view !== item.id)
-                e.currentTarget.style.color = C.textSub;
-            }}
-          >
-            {view === item.id && (
-              <div
-                className="absolute left-0 top-0 bottom-0 w-0.5"
-                style={{ background: C.cyan }}
-              />
-            )}
-            {item.icon}
-            <span className="font-mono text-xs">
-              {item.label}
-            </span>
-            {item.id === "REPORTS" && unresolvedCount > 0 && (
-              <span
-                className="ml-auto font-mono text-[9px] px-1.5 py-0.5"
-                style={{
-                  background: `${C.amber}20`,
-                  color: C.amber,
-                }}
-              >
-                {unresolvedCount}
-              </span>
-            )}
-          </button>
-        ))}
-
-        {isAdmin && (
-          <>
-            <div className="px-5 pt-4 pb-2">
-              <div
-                className="h-px mb-3"
-                style={{ background: C.border }}
-              />
-              <span
-                className="font-mono text-[9px] uppercase tracking-[0.2em]"
-                style={{ color: C.textDim }}
-              >
-                Administration
-              </span>
-            </div>
+        {roleNavItems.map((item) => {
+          const itemColor = item.color ?? C.cyan;
+          const isActive = view === item.id;
+          return (
             <button
-              onClick={() => onView("ADMIN")}
+              key={item.id}
+              onClick={() => onView(item.id)}
               className="w-full flex items-center gap-3 px-5 py-2.5 transition-colors text-left relative"
               style={{
-                color: view === "ADMIN" ? C.cyan : C.textSub,
-                background:
-                  view === "ADMIN"
-                    ? `${C.cyan}08`
-                    : "transparent",
+                color: isActive ? itemColor : C.textSub,
+                background: isActive ? `${itemColor}0C` : "transparent",
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) e.currentTarget.style.color = C.text;
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) e.currentTarget.style.color = C.textSub;
               }}
             >
-              {view === "ADMIN" && (
+              {isActive && (
                 <div
                   className="absolute left-0 top-0 bottom-0 w-0.5"
-                  style={{ background: C.cyan }}
+                  style={{ background: itemColor }}
                 />
               )}
-              <Shield size={15} />
+              {item.icon}
               <span className="font-mono text-xs">
-                Admin Console
+                {item.label}
               </span>
-            </button>
-            <button
-              onClick={() => onView("SETTINGS")}
-              className="w-full flex items-center gap-3 px-5 py-2.5 transition-colors text-left relative"
-              style={{
-                color: view === "SETTINGS" ? C.cyan : C.textSub,
-                background:
-                  view === "SETTINGS"
-                    ? `${C.cyan}08`
-                    : "transparent",
-              }}
-            >
-              {view === "SETTINGS" && (
-                <div
-                  className="absolute left-0 top-0 bottom-0 w-0.5"
-                  style={{ background: C.cyan }}
-                />
-              )}
-              <Settings size={15} />
-              <span className="font-mono text-xs">
-                Org Settings
-              </span>
-            </button>
-            <button
-              onClick={() => onView("JOIN_CODES")}
-              className="w-full flex items-center gap-3 px-5 py-2.5 transition-colors text-left relative"
-              style={{
-                color: view === "JOIN_CODES" ? C.cyan : C.textSub,
-                background: view === "JOIN_CODES" ? `${C.cyan}08` : "transparent",
-              }}
-            >
-              {view === "JOIN_CODES" && (
-                <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ background: C.cyan }} />
-              )}
-              <Hash size={15} />
-              <span className="font-mono text-xs">Join Codes</span>
-            </button>
-            <button
-              onClick={() => onView("MODERATION")}
-              className="w-full flex items-center gap-3 px-5 py-2.5 transition-colors text-left relative"
-              style={{
-                color: view === "MODERATION" ? C.cyan : C.textSub,
-                background: view === "MODERATION" ? `${C.cyan}08` : "transparent",
-              }}
-            >
-              {view === "MODERATION" && (
-                <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ background: C.cyan }} />
-              )}
-              <Flag size={15} />
-              <span className="font-mono text-xs">Moderation</span>
-            </button>
-            {(isSuperAdmin || org.role === "OWNER") && (
-              <>
-                <button
-                  onClick={() => onView("ORG_APPLICATIONS")}
-                  className="w-full flex items-center gap-3 px-5 py-2.5 transition-colors text-left relative"
+              {item.badge !== undefined && item.badge > 0 && (
+                <span
+                  className="ml-auto font-mono text-[9px] px-1.5 py-0.5"
                   style={{
-                    color: view === "ORG_APPLICATIONS" ? C.rose : C.textSub,
-                    background: view === "ORG_APPLICATIONS" ? `${C.rose}08` : "transparent",
+                    background: `${C.amber}20`,
+                    color: C.amber,
                   }}
                 >
-                  {view === "ORG_APPLICATIONS" && (
-                    <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ background: C.rose }} />
-                  )}
-                  <Building2 size={15} />
-                  <span className="font-mono text-xs">Org Applications</span>
-                </button>
-                <button
-                  onClick={() => onView("PLATFORM")}
-                  className="w-full flex items-center gap-3 px-5 py-2.5 transition-colors text-left relative"
-                  style={{
-                    color: view === "PLATFORM" ? C.rose : C.textSub,
-                    background: view === "PLATFORM" ? `${C.rose}08` : "transparent",
-                  }}
-                >
-                  {view === "PLATFORM" && (
-                    <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ background: C.rose }} />
-                  )}
-                  <Terminal size={15} />
-                  <span className="font-mono text-xs">Platform Admin</span>
-                </button>
-              </>
-            )}
-          </>
-        )}
-        {/* Track report - always visible */}
-        <div className="px-5 pt-4 pb-2">
-          <div className="h-px mb-3" style={{ background: C.border }} />
-        </div>
-        <button
-          onClick={() => onView("TRACK")}
-          className="w-full flex items-center gap-3 px-5 py-2.5 transition-colors text-left relative"
-          style={{
-            color: view === "TRACK" ? C.cyan : C.textSub,
-            background: view === "TRACK" ? `${C.cyan}08` : "transparent",
-          }}
-        >
-          {view === "TRACK" && (
-            <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ background: C.cyan }} />
-          )}
-          <Eye size={15} />
-          <span className="font-mono text-xs">Track a Report</span>
-        </button>
+                  {item.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </nav>
 
       {/* Bottom */}
@@ -1414,9 +1319,20 @@ function OverviewView({
   onViewReports: () => void;
   onViewDetail: (id: string) => void;
 }) {
-  const resolved = reports.filter(
+  const [liveMetrics, setLiveMetrics] = useState<OrganizationMetrics | null>(null);
+
+  useEffect(() => {
+    getOrganizationMetrics()
+      .then(setLiveMetrics)
+      .catch(() => {});
+  }, []);
+
+  const totalReportsCount = liveMetrics?.totalComplaints ?? reports.length;
+  const inProgressCount = liveMetrics?.inProgressComplaints ?? reports.filter((r) => r.status === "IN_PROGRESS").length;
+  const resolved = liveMetrics?.resolvedComplaints ?? reports.filter(
     (r) => r.status === "RESOLVED",
   ).length;
+  const unassignedCount = liveMetrics?.unassignedCases ?? reports.filter((r) => !r.assignedTo).length;
   const unresolved = reports.filter(
     (r) =>
       !["RESOLVED", "REJECTED", "ARCHIVED"].includes(r.status),
@@ -1498,28 +1414,28 @@ function OverviewView({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
             {
-              label: "Unresolved",
-              value: unresolved,
-              sub: "active reports",
+              label: "Total Complaints",
+              value: totalReportsCount,
+              sub: "all time in institution",
+              color: C.cyan,
+            },
+            {
+              label: "In Progress",
+              value: inProgressCount,
+              sub: "active investigations",
               color: C.amber,
             },
             {
-              label: "Critical",
-              value: critical,
-              sub: "require immediate action",
-              color: C.rose,
-            },
-            {
-              label: "SLA Compliance",
-              value: `${slaCompliance}%`,
-              sub: "within deadline",
+              label: "Resolved",
+              value: resolved,
+              sub: "successfully addressed",
               color: C.emerald,
             },
             {
-              label: "Total Reports",
-              value: reports.length,
-              sub: "all time",
-              color: C.textSub,
+              label: "Unassigned Cases",
+              value: unassignedCount,
+              sub: unassignedCount > 0 ? "requires assignment" : "all assigned",
+              color: unassignedCount > 0 ? C.rose : C.textSub,
             },
           ].map((m) => (
             <div
@@ -1946,10 +1862,14 @@ function ReportRow({
 function ReportsView({
   reports,
   onDetail,
+  userRole,
 }: {
   reports: Report[];
   onDetail: (id: string) => void;
+  userRole?: 'STUDENT' | 'INVESTIGATOR' | 'ADMIN' | 'SUPER_ADMIN';
 }) {
+  const isStudent = userRole === "STUDENT";
+  const isInvestigator = userRole === "INVESTIGATOR";
   const [filter, setFilter] = useState<FilterStatus>("ALL");
   const [deptFilter, setDeptFilter] = useState<string>("ALL");
   const [assignFilter, setAssignFilter] = useState<"ALL" | "ASSIGNED" | "UNASSIGNED">("ALL");
@@ -2029,6 +1949,26 @@ function ReportsView({
       className="flex-1 overflow-auto flex flex-col"
       style={{ background: C.bg }}
     >
+      {/* Role-Specific Header */}
+      <div className="px-6 pt-5 pb-3 flex items-center justify-between border-b" style={{ borderColor: C.border }}>
+        <div>
+          <h2 className="font-serif text-xl" style={{ color: C.text }}>
+            {isStudent
+              ? "My Complaints"
+              : isInvestigator
+              ? "Assigned Cases"
+              : "All Complaints"}
+          </h2>
+          <p className="font-mono text-[10px] mt-0.5" style={{ color: C.textDim }}>
+            {isStudent
+              ? "Confidential records of your submitted reports and live status"
+              : isInvestigator
+              ? "Active case queue assigned to your investigation workflow"
+              : "Organization-wide incident and grievance log"}
+          </p>
+        </div>
+      </div>
+
       {/* Toolbar */}
       <div
         className="sticky top-0 z-10 border-b"
@@ -2139,25 +2079,27 @@ function ReportsView({
             </select>
           </div>
 
-          <div className="flex items-center gap-1">
-            <span className="font-mono text-[9px] uppercase tracking-widest mr-1" style={{ color: C.textDim }}>
-              Investigator:
-            </span>
-            {(["ALL", "ASSIGNED", "UNASSIGNED"] as const).map((a) => (
-              <button
-                key={a}
-                onClick={() => setAssignFilter(a)}
-                className="px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest border transition-all"
-                style={{
-                  borderColor: assignFilter === a ? C.cyan : C.border,
-                  color: assignFilter === a ? C.cyan : C.textDim,
-                  background: assignFilter === a ? `${C.cyan}0C` : "transparent",
-                }}
-              >
-                {a === "ALL" ? "All" : a === "ASSIGNED" ? "Assigned" : "Unassigned"}
-              </button>
-            ))}
-          </div>
+          {!isStudent && (
+            <div className="flex items-center gap-1">
+              <span className="font-mono text-[9px] uppercase tracking-widest mr-1" style={{ color: C.textDim }}>
+                Investigator:
+              </span>
+              {(["ALL", "ASSIGNED", "UNASSIGNED"] as const).map((a) => (
+                <button
+                  key={a}
+                  onClick={() => setAssignFilter(a)}
+                  className="px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest border transition-all"
+                  style={{
+                    borderColor: assignFilter === a ? C.cyan : C.border,
+                    color: assignFilter === a ? C.cyan : C.textDim,
+                    background: assignFilter === a ? `${C.cyan}0C` : "transparent",
+                  }}
+                >
+                  {a === "ALL" ? "All" : a === "ASSIGNED" ? "Assigned" : "Unassigned"}
+                </button>
+              ))}
+            </div>
+          )}
 
           <span
             className="ml-auto font-mono text-[10px] flex-shrink-0"
@@ -2230,13 +2172,17 @@ function ReportDetailView({
   onUpdateStatus,
   onUpdateReport,
   isAdmin,
+  userRole,
 }: {
   report: Report;
   onBack: () => void;
   onUpdateStatus: (id: string, s: ReportStatus) => void;
   onUpdateReport?: (updated: Report) => void;
   isAdmin: boolean;
+  userRole?: 'STUDENT' | 'INVESTIGATOR' | 'ADMIN' | 'SUPER_ADMIN';
 }) {
+  const isInvestigator = userRole === 'INVESTIGATOR';
+  const isStudent = userRole === 'STUDENT' || (!isAdmin && !isInvestigator);
   const [report, setReport] = useState<Report>(initialReport);
 
   useEffect(() => {
@@ -2434,18 +2380,26 @@ function ReportDetailView({
 
           {/* Detail Tabs */}
           <div className="flex border-b -mx-8 px-8" style={{ borderColor: C.border }}>
-            {(isAdmin
+            {(isStudent
               ? [
+                  { id: "overview", label: "Overview" },
+                  { id: "communication", label: "Messages" },
+                  { id: "evidence", label: `Evidence (${report.evidence.length})` },
+                ] as const
+              : isInvestigator
+              ? [
+                  { id: "overview", label: "Overview" },
+                  { id: "communication", label: "Messages & Notes" },
+                  { id: "evidence", label: `Evidence (${report.evidence.length})` },
+                  { id: "resolution", label: "Resolution" },
+                ] as const
+              : [
                   { id: "overview", label: "Overview" },
                   { id: "communication", label: "Messages" },
                   { id: "evidence", label: `Evidence (${report.evidence.length})` },
                   { id: "assignment", label: "Assignment" },
                   { id: "resolution", label: "Resolution" },
                   { id: "ai", label: "AI Analysis" },
-                ] as const
-              : [
-                  { id: "overview", label: "Overview" },
-                  { id: "evidence", label: `Evidence (${report.evidence.length})` },
                 ] as const
             ).map(tab => (
               <button
@@ -2464,56 +2418,56 @@ function ReportDetailView({
 
           {detailTab === "overview" && (
             <div className="space-y-4">
-              {/* Internal note (admin) */}
-              {isAdmin && (
-            <div>
-              <div
-                className="font-mono text-[10px] uppercase tracking-widest mb-2"
-                style={{ color: C.textDim }}
-              >
-                Internal Note (Admin only)
-              </div>
-              <textarea
-                value={internalNote}
-                onChange={(e) =>
-                  setInternalNote(e.target.value)
-                }
-                rows={3}
-                placeholder="Add an internal note visible only to administrators..."
-                className="w-full px-4 py-3 font-mono text-xs border bg-transparent outline-none resize-none transition-all"
-                style={{ borderColor: C.border, color: C.text }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = C.cyan;
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = C.border;
-                }}
-              />
-              <button
-                onClick={() => toast.success("Note saved")}
-                className="mt-2 flex items-center gap-2 px-4 py-1.5 font-mono text-xs uppercase tracking-widest"
-                style={{
-                  background: C.surface2,
-                  color: C.textSub,
-                  border: `1px solid ${C.border}`,
-                }}
-              >
-                <Check size={11} /> Save Note
-              </button>
-            </div>
-          )}
+              {/* Internal note (admin / investigator) */}
+              {(isAdmin || isInvestigator) && (
+                <div>
+                  <div
+                    className="font-mono text-[10px] uppercase tracking-widest mb-2"
+                    style={{ color: C.textDim }}
+                  >
+                    Internal Note (Staff only)
+                  </div>
+                  <textarea
+                    value={internalNote}
+                    onChange={(e) =>
+                      setInternalNote(e.target.value)
+                    }
+                    rows={3}
+                    placeholder="Add an internal note visible only to administrators and investigators..."
+                    className="w-full px-4 py-3 font-mono text-xs border bg-transparent outline-none resize-none transition-all"
+                    style={{ borderColor: C.border, color: C.text }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = C.cyan;
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = C.border;
+                    }}
+                  />
+                  <button
+                    onClick={() => toast.success("Note saved")}
+                    className="mt-2 flex items-center gap-2 px-4 py-1.5 font-mono text-xs uppercase tracking-widest"
+                    style={{
+                      background: C.surface2,
+                      color: C.textSub,
+                      border: `1px solid ${C.border}`,
+                    }}
+                  >
+                    <Check size={11} /> Save Note
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
-          {detailTab === "communication" && isAdmin && (
+          {detailTab === "communication" && (
             <div className="space-y-6">
-              <CaseCommunication caseId={report.id} isAdmin={true} />
-              <InternalNotesPanel caseId={report.id} />
+              <CaseCommunication caseId={report.id} isAdmin={isAdmin || isInvestigator} />
+              {(isAdmin || isInvestigator) && <InternalNotesPanel caseId={report.id} />}
             </div>
           )}
 
           {detailTab === "evidence" && (
-            <EvidenceWorkspace evidence={report.evidence} caseId={report.id} isAdmin={isAdmin} />
+            <EvidenceWorkspace evidence={report.evidence} caseId={report.id} isAdmin={isAdmin || isInvestigator} />
           )}
 
           {detailTab === "assignment" && isAdmin && (
@@ -2528,7 +2482,7 @@ function ReportDetailView({
             />
           )}
 
-          {detailTab === "resolution" && isAdmin && (
+          {detailTab === "resolution" && (isAdmin || isInvestigator) && (
             <div className="space-y-4">
               <ResolutionForm
                 caseId={report.id}
@@ -2574,10 +2528,12 @@ function ReportDetailView({
                   label: "Reporter",
                   value: report.anonymousId,
                 },
-                {
-                  label: "Assigned To",
-                  value: report.assignedTo ?? "Unassigned",
-                },
+                ...(!isStudent ? [
+                  {
+                    label: "Assigned To",
+                    value: report.assignedTo ?? "Unassigned",
+                  },
+                ] : []),
               ].map((row) => (
                 <div
                   key={row.label}
@@ -2611,7 +2567,7 @@ function ReportDetailView({
               </div>
             </div>
 
-            {isAdmin && (
+            {(isAdmin || isInvestigator) && (
               <div
                 className="mt-4 pt-4 border-t"
                 style={{ borderColor: C.border }}
@@ -5128,6 +5084,11 @@ export default function App() {
     try {
       const profile = await getCurrentUser();
       setUserProfile(profile);
+      if (profile.role === "STUDENT" || profile.role === "INVESTIGATOR") {
+        setOrgView((prev) => (prev === "OVERVIEW" ? "REPORTS" : prev));
+      } else if (profile.role === "SUPER_ADMIN") {
+        setOrgView((prev) => (prev === "OVERVIEW" ? "PLATFORM" : prev));
+      }
       if (profile.organization && !currentOrg) {
         setCurrentOrg({
           id: String(profile.organization.id),
@@ -5192,10 +5153,16 @@ export default function App() {
     setReportsLoading(true);
     setReportsError(null);
     try {
-      // Try admin feed first; fall back to public feed if 403
+      // Query endpoint based on authenticated role
       let page;
       try {
-        page = await getAdminFeed({ size: 100, sort: "createdAt,desc" });
+        if (userProfile?.role === "STUDENT") {
+          page = await getMyComplaints({ size: 100 });
+        } else if (userProfile?.role === "INVESTIGATOR") {
+          page = await getAssignedComplaints({ size: 100 });
+        } else {
+          page = await getAdminFeed({ size: 100, sort: "createdAt,desc" });
+        }
       } catch (err) {
         if (err instanceof ApiError && err.status === 403) {
           page = await getPublicFeed({ size: 100, sort: "createdAt,desc" });
@@ -5226,7 +5193,7 @@ export default function App() {
     if (appState === "ORG") {
       loadReports();
     }
-  }, [appState]);
+  }, [appState, userProfile?.role]);
 
   // ── Auth handlers ─────────────────────────────────────────────────────────────
   const handleLoginSuccess = async () => {
@@ -5245,7 +5212,13 @@ export default function App() {
   // ── Navigation handlers ───────────────────────────────────────────────────────
   const handleEnterOrg = (org: Organization) => {
     setCurrentOrg(org);
-    setOrgView("OVERVIEW");
+    const initialView: OrgView =
+      userProfile?.role === "STUDENT" || userProfile?.role === "INVESTIGATOR"
+        ? "REPORTS"
+        : userProfile?.role === "SUPER_ADMIN"
+        ? "PLATFORM"
+        : "OVERVIEW";
+    setOrgView(initialView);
     setAppState("ORG");
   };
 
@@ -5497,6 +5470,7 @@ export default function App() {
             allOrgs={_orgs}
             view={orgView}
             isSuperAdmin={isSuperAdmin}
+            userRole={userProfile?.role}
             onView={(v) => {
               setOrgView(v);
               if (v !== "DETAIL") setSelectedReportId(null);
@@ -5531,6 +5505,7 @@ export default function App() {
               <ReportsView
                 reports={reports}
                 onDetail={handleOpenDetail}
+                userRole={userProfile?.role}
               />
             )}
             {orgView === "DETAIL" && selectedReport && (
@@ -5547,6 +5522,7 @@ export default function App() {
                   );
                 }}
                 isAdmin={isAdmin}
+                userRole={userProfile?.role}
               />
             )}
             {orgView === "SUBMIT" && (

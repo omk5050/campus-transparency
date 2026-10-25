@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import {
   Building2, Shield, Activity, AlertTriangle, Check, X, Clock,
@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import type { PlatformOrg, PlatformMetrics, SecurityStatus } from '../types';
 import { platformOrgs, platformMetrics, securityStatuses } from '../data';
+import { getPlatformMetrics, PlatformMetrics as LivePlatformMetrics } from '../api';
 
 const C = {
   bg: '#08090E', surface: '#0F1117', surface2: '#161921',
@@ -169,6 +170,13 @@ export function PlatformAdminView() {
   const [tab, setTab] = useState<AdminTab>('overview');
   const metrics = platformMetrics;
   const orgs = platformOrgs;
+  const [liveMetrics, setLiveMetrics] = useState<LivePlatformMetrics | null>(null);
+
+  useEffect(() => {
+    getPlatformMetrics()
+      .then(setLiveMetrics)
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="flex-1 overflow-auto" style={{ background: C.bg }}>
@@ -210,10 +218,29 @@ export function PlatformAdminView() {
         {tab === 'overview' && (
           <>
             <div className="grid grid-cols-4 gap-4">
-              <MetricCard label="Total Organisations" value={metrics.totalOrgs} sub={`${metrics.activeOrgs} active`} color={C.cyan} />
-              <MetricCard label="Total Reports" value={metrics.totalReports.toLocaleString()} sub="All time" />
-              <MetricCard label="Avg Resolution (h)" value={metrics.avgResolutionHours} color={C.emerald} />
-              <MetricCard label="Reporter Satisfaction" value={`${metrics.reporterSatisfaction}%`} color={C.emerald} />
+              <MetricCard
+                label="Total Organisations"
+                value={liveMetrics?.totalOrganizations ?? metrics.totalOrgs}
+                sub={`${liveMetrics?.activeOrganizations ?? metrics.activeOrgs} active`}
+                color={C.cyan}
+              />
+              <MetricCard
+                label="Total Reports"
+                value={(liveMetrics?.totalComplaints ?? metrics.totalReports).toLocaleString()}
+                sub="All time platform-wide"
+              />
+              <MetricCard
+                label="Pending Applications"
+                value={liveMetrics?.pendingApplications ?? 0}
+                sub="Awaiting Super Admin review"
+                color={C.amber}
+              />
+              <MetricCard
+                label="Suspended Orgs"
+                value={liveMetrics?.suspendedOrganizations ?? 0}
+                sub="Under investigation"
+                color={liveMetrics && liveMetrics.suspendedOrganizations > 0 ? C.rose : C.emerald}
+              />
             </div>
 
             <div className="grid grid-cols-3 gap-4">

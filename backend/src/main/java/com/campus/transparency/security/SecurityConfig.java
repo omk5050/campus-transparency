@@ -65,9 +65,13 @@ public class SecurityConfig {
                         // Require ADMIN or SUPER_ADMIN role for organization join code management
                         .requestMatchers("/api/admin/join-codes", "/api/admin/join-codes/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
 
-                        // Require ADMIN or SUPER_ADMIN role for internal notes and investigator messages
-                        .requestMatchers("/api/issues/*/internal-notes", "/api/issues/*/internal-notes/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
-                        .requestMatchers("/api/issues/*/messages", "/api/issues/*/messages/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
+                        // Operational & platform metrics
+                        .requestMatchers("/api/admin/metrics").hasAnyRole("ADMIN", "SUPER_ADMIN")
+                        .requestMatchers("/api/super-admin/metrics").hasRole("SUPER_ADMIN")
+
+                        // Require INVESTIGATOR, ADMIN or SUPER_ADMIN role for internal notes and investigator messages
+                        .requestMatchers("/api/issues/*/internal-notes", "/api/issues/*/internal-notes/**").hasAnyRole("INVESTIGATOR", "ADMIN", "SUPER_ADMIN")
+                        .requestMatchers("/api/issues/*/messages", "/api/issues/*/messages/**").hasAnyRole("INVESTIGATOR", "ADMIN", "SUPER_ADMIN")
                         
                         // Require authentication for issue attachments
                         .requestMatchers("/api/issues/*/attachments", "/api/issues/*/attachments/**").authenticated()
@@ -75,8 +79,9 @@ public class SecurityConfig {
                         // Require authentication for notification endpoints
                         .requestMatchers("/api/notifications", "/api/notifications/**").authenticated()
 
-                        // Allow public access to view the issues feed without being logged in
-                        .requestMatchers(HttpMethod.GET, "/api/issues", "/api/issues/**").permitAll()
+                        // Allow public access to track a specific report by tracking code only
+                        .requestMatchers(HttpMethod.GET, "/api/issues/track/**").permitAll()
+                        .requestMatchers("/api/issues", "/api/issues/**").authenticated()
 
                         // Require authentication for all other backend API requests
                         .anyRequest().authenticated())

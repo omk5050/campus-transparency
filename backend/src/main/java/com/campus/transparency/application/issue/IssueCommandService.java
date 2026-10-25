@@ -51,17 +51,24 @@ public class IssueCommandService {
     @Transactional
     public Issue create(String title, String description, String reporterHash, String category, String department) {
         Organization org = null;
+        com.campus.transparency.domain.user.User reporter = null;
         try {
             org = currentUserService.getCurrentOrganization();
+            reporter = currentUserService.getCurrentUser();
         } catch (Exception e) {
-            // In non-web contexts, org will be null unless passed explicitly
+            // In non-web contexts, org and reporter will be null unless passed explicitly
         }
-        return create(title, description, reporterHash, category, department, org);
+        return create(title, description, reporterHash, category, department, org, reporter);
     }
 
     @Transactional
     public Issue create(String title, String description, String reporterHash, String category, String department, Organization organization) {
-        Issue issue = new Issue(title, description, reporterHash, category, department, organization);
+        return create(title, description, reporterHash, category, department, organization, null);
+    }
+
+    @Transactional
+    public Issue create(String title, String description, String reporterHash, String category, String department, Organization organization, com.campus.transparency.domain.user.User reporter) {
+        Issue issue = new Issue(title, description, reporterHash, category, department, organization, null, reporter);
         issue = issueRepository.save(issue);
         auditLogRepository.save(new AuditLog(issue, "ISSUE_CREATED", "system"));
         return issue;
@@ -100,6 +107,14 @@ public class IssueCommandService {
     }
 
     @Transactional
+    public void unhide(Long issueId) {
+        Issue issue = getIssue(issueId);
+        issue.unhide();
+        issueRepository.save(issue);
+        auditLogRepository.save(new AuditLog(issue, "ISSUE_UNHIDDEN", "admin"));
+    }
+
+    @Transactional
     public void upvote(Long issueId) {
         Issue issue = getIssue(issueId);
         issue.upvote();
@@ -126,7 +141,7 @@ public class IssueCommandService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
 
-        if (user.getRole() != Role.ADMIN) {
+        if (user.getRole() != Role.ADMIN && user.getRole() != Role.INVESTIGATOR) {
             throw new IllegalArgumentException("Only administrative staff / investigators can be assigned to issues");
         }
 

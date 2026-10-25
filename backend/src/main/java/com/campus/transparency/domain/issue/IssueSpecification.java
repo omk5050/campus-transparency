@@ -43,4 +43,10 @@ public class IssueSpecification {
                 ? null
                 : cb.equal(root.get("organization").get("id"), organizationId);
     }
+
+    public static Specification<Issue> reportedByUser(Long userId) {
+        return (root, query, cb) -> userId == null
+                ? null
+                : cb.equal(root.get("reporter").get("id"), userId);
+    }
 }
