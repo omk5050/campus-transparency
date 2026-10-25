@@ -11,4 +11,5 @@ public interface OrganizationRepository extends JpaRepository<Organization, Long
     boolean existsByNameIgnoreCase(String name);
     boolean existsByOfficialEmailIgnoreCase(String officialEmail);
     long countByStatus(OrganizationStatus status);
+    java.util.List<Organization> findByStatus(OrganizationStatus status);
 }

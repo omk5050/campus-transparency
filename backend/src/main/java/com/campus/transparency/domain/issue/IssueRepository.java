@@ -41,4 +41,58 @@ public interface IssueRepository extends JpaRepository<Issue, Long>, JpaSpecific
     long countByOrganizationIdAndStatus(Long organizationId, IssueStatus status);
     long countByOrganizationIdAndAssignedToIsNotNull(Long organizationId);
     long countByOrganizationIdAndAssignedToIsNull(Long organizationId);
+
+    long countByOrganizationIdAndCreatedAtGreaterThanEqual(Long organizationId, Instant since);
+    long countByOrganizationIdAndStatusAndCreatedAtGreaterThanEqual(Long organizationId, IssueStatus status, Instant since);
+    long countByOrganizationIdAndAssignedToIsNotNullAndCreatedAtGreaterThanEqual(Long organizationId, Instant since);
+    long countByOrganizationIdAndAssignedToIsNullAndCreatedAtGreaterThanEqual(Long organizationId, Instant since);
+
+    @Query("""
+        select i.category, count(i) from Issue i
+        where i.organization.id = :orgId and i.createdAt >= :since
+        group by i.category
+    """)
+    List<Object[]> countGroupedByCategory(Long orgId, Instant since);
+
+    @Query("""
+        select i.department, count(i) from Issue i
+        where i.organization.id = :orgId and i.createdAt >= :since
+        group by i.department
+    """)
+    List<Object[]> countGroupedByDepartment(Long orgId, Instant since);
+
+    @Query("""
+        select i from Issue i
+        where i.organization.id = :orgId
+          and i.status = com.campus.transparency.domain.issue.IssueStatus.RESOLVED
+          and i.createdAt >= :since
+    """)
+    List<Issue> findResolvedByOrganizationIdAndPeriod(Long orgId, Instant since);
+
+    long countByCreatedAtGreaterThanEqual(Instant since);
+    long countByStatusAndCreatedAtGreaterThanEqual(IssueStatus status, Instant since);
+
+    @Query("""
+        select i from Issue i
+        where i.status = com.campus.transparency.domain.issue.IssueStatus.RESOLVED
+          and i.createdAt >= :since
+    """)
+    List<Issue> findAllResolvedByPeriod(Instant since);
+
+    @Query("""
+        select i.organization.id, i.status, count(i)
+        from Issue i
+        where i.organization.status = com.campus.transparency.domain.organization.OrganizationStatus.ACTIVE
+          and i.createdAt >= :since
+        group by i.organization.id, i.status
+    """)
+    List<Object[]> countActiveGroupedByOrgAndStatus(Instant since);
+
+    @Query("""
+        select i from Issue i
+        where i.organization.status = com.campus.transparency.domain.organization.OrganizationStatus.ACTIVE
+          and i.status = com.campus.transparency.domain.issue.IssueStatus.RESOLVED
+          and i.createdAt >= :since
+    """)
+    List<Issue> findActiveResolvedByPeriod(Instant since);
 }

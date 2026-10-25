@@ -56,6 +56,9 @@ public class Issue extends BaseEntity {
     @JoinColumn(name = "organization_id", nullable = false)
     private com.campus.transparency.domain.organization.Organization organization;
 
+    @Column(name = "resolved_at")
+    private java.time.Instant resolvedAt;
+
     protected Issue() {
         // JPA only
     }
@@ -102,6 +105,11 @@ public class Issue extends BaseEntity {
             );
         }
         this.status = next;
+        if (next == IssueStatus.RESOLVED) {
+            this.resolvedAt = java.time.Instant.now();
+        } else if (next == IssueStatus.REPORTED || next == IssueStatus.IN_PROGRESS || next == IssueStatus.UNDER_REVIEW) {
+            this.resolvedAt = null;
+        }
     }
 
 
@@ -201,5 +209,13 @@ public class Issue extends BaseEntity {
 
     public void setOrganization(com.campus.transparency.domain.organization.Organization organization) {
         this.organization = organization;
+    }
+
+    public java.time.Instant getResolvedAt() {
+        return resolvedAt != null ? resolvedAt : (status == IssueStatus.RESOLVED ? getUpdatedAt() : null);
+    }
+
+    public void setResolvedAt(java.time.Instant resolvedAt) {
+        this.resolvedAt = resolvedAt;
     }
 }

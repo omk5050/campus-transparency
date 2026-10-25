@@ -59,6 +59,9 @@ public class SecurityConfig {
                         // Allow public submission of organization applications
                         .requestMatchers(HttpMethod.POST, "/api/organization-applications").permitAll()
 
+                        // Allow public access to public transparency and organization leaderboard
+                        .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
+
                         // Require SUPER_ADMIN role for organization application reviews
                         .requestMatchers("/api/admin/organization-applications", "/api/admin/organization-applications/**").hasRole("SUPER_ADMIN")
 

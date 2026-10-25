@@ -294,3 +294,51 @@ To achieve true zero-knowledge complaint privacy:
    - Even if a legacy client passes a fixed hash, the server generates an isolated internal hash token (`anon_<random_uuid>`) ensuring that no two database rows share a linkable hash.
 4. **Zero-Knowledge Application Logging:**
    - Log statements record only the issue title and the complaint-specific pseudonym (e.g. `Student created new issue titled '...' (pseudonym: Complainant #8F4C)`), never raw user credentials or fixed identifiers.
+
+---
+
+## 12. Phase P3 — Public Aggregate Transparency & Institutional Leaderboard Engine
+
+### A. Core Architecture & Tenant Isolation Invariant
+The ETHOS public transparency layer enforces a strict boundary between public institutional accountability and complainant confidentiality:
+1. **Zero Individual Complaint Exposure:** Public transparency APIs (`/api/public/**`) never serialize or return individual complaints, titles, descriptions, complainant pseudonyms, tracking codes, or assigned investigator identities.
+2. **Mathematical Aggregation at Server Boundary:** All statistics (total complaints, resolution rate, median turnaround hours, and category/department breakdown) are computed via server-side aggregation (`COUNT`, `GROUP BY`, percentile derivations) strictly scoped to active organizations.
+3. **Database Performance & Migration (Flyway `V13`):**
+   - Added `resolved_at TIMESTAMP WITH TIME ZONE` to `issues` table to enable high-precision calculation of resolution speed and turnaround metrics.
+   - Retained automatic backward-compatibility fallback (`getResolvedAt()` defaults to `getUpdatedAt()` when status is `RESOLVED`).
+
+### B. The ETHOS Score Formulation (0–100 Normalized Scale)
+Institutional governance quality is computed dynamically across four weighted dimensions:
+1. **Resolution Success (40%):**
+   $$\text{Resolution Rate} = \frac{\text{Resolved Complaints}}{\max(1, \text{Total Complaints} - \text{Rejected Complaints})} \times 100$$
+   Rejected complaints (e.g., spam, duplicates) are explicitly excluded from the eligible denominator so institutions are not penalized for dismissing invalid submissions.
+2. **Turnaround Velocity / Speed (30%):**
+   Median resolution time is converted to an efficiency score:
+   - Full credit (30 points) awarded for median resolution $\le 24$ hours.
+   - Scaled linearly between 24 hours and 168 hours (7 days).
+   - Base credit (6 points) for resolutions exceeding 168 hours.
+   - Median is chosen over mean to protect against extreme outliers skewing institutional velocity.
+3. **Investigator Activity & Engagement (20%):**
+   Proportion of active cases currently transitioned beyond the initial unassigned/reported state into active investigation (`IN_PROGRESS`).
+4. **Accountability Volume Factor (10%):**
+   Logarithmically scaled volume score ($\min(10.0, \log_2(\text{eligible} + 1) \times 2.5)$) rewarding organizations that transparently log and manage higher volumes of community signals.
+
+### C. Anti-Gaming Guardrail (Provisional Classification)
+To prevent small-sample gaming (e.g., a newly registered organization resolving 1 single test complaint to claim a 100% score and #1 rank):
+- **`QUALIFIED` Status:** Conferred only to organizations with $\ge 10$ eligible complaints.
+- **`PROVISIONAL` Status:** Automatically assigned to organizations with $< 10$ eligible complaints. The UI explicitly flags provisional ratings with an alert badge and explanatory disclaimer.
+
+### D. Deterministic Ranking & Tie-Breaking
+Leaderboard entries are ordered strictly and deterministically:
+1. `Ethos Score DESC`
+2. `Resolution Rate DESC`
+3. `Median Resolution Hours ASC`
+4. `Organization Name ASC (case-insensitive)`
+
+### E. Public Endpoints & Time-Window Filtering
+All transparency endpoints accept an optional `period` parameter (`ALL_TIME`, `LAST_90_DAYS`, `LAST_30_DAYS`, `LAST_7_DAYS`):
+- `GET /api/public/leaderboard?period=`: Returns ranked list of active institutions with Ethos scores, resolution rates, and turnaround speeds.
+- `GET /api/public/transparency?period=`: Returns platform-wide KPI aggregates (active tenants, total resolved complaints, platform median turnaround) and top leaderboard entries.
+- `GET /api/public/organizations/{id}/transparency?period=`: Returns full aggregate profile for an institution including category and department breakdown.
+- `GET /api/admin/metrics?period=`: Authenticated tenant-scoped operational metrics for institutional administrators.
+

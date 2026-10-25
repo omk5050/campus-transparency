@@ -588,6 +588,14 @@ export interface OrganizationMetrics {
   rejectedComplaints: number;
   assignedCases: number;
   unassignedCases: number;
+  resolutionRate?: number;
+  averageResolutionHours?: number;
+  medianResolutionHours?: number;
+  ethosScore?: number;
+  qualificationStatus?: 'QUALIFIED' | 'PROVISIONAL';
+  complaintsByCategory?: Record<string, number>;
+  complaintsByDepartment?: Record<string, number>;
+  period?: string;
 }
 
 export interface PlatformMetrics {
@@ -599,8 +607,9 @@ export interface PlatformMetrics {
 }
 
 /** GET /api/admin/metrics — Tenant-scoped operational metrics */
-export async function getOrganizationMetrics(): Promise<OrganizationMetrics> {
-  return request<OrganizationMetrics>('/admin/metrics');
+export async function getOrganizationMetrics(period?: string): Promise<OrganizationMetrics> {
+  const query = buildQuery({ period });
+  return request<OrganizationMetrics>(`/admin/metrics${query}`);
 }
 
 /** GET /api/super-admin/metrics — Platform-level metrics */
@@ -929,6 +938,75 @@ export async function deleteIssueAttachment(
   return request<void>(`/issues/${issueId}/attachments/${attachmentId}`, {
     method: 'DELETE',
   });
+}
+
+// ─── Public Transparency & Leaderboard (Phase P3) ───────────────────────────
+
+export interface LeaderboardEntry {
+  rank: number;
+  organizationId: number;
+  organizationName: string;
+  organizationType: string;
+  ethosScore: number;
+  resolutionRate: number;
+  averageResolutionHours: number;
+  medianResolutionHours: number;
+  totalEligibleComplaints: number;
+  totalComplaints: number;
+  resolvedComplaints: number;
+  qualificationStatus: 'QUALIFIED' | 'PROVISIONAL';
+}
+
+export interface PublicTransparencySummary {
+  totalOrganizations: number;
+  activeOrganizations: number;
+  totalComplaintsPlatform: number;
+  resolvedComplaintsPlatform: number;
+  platformResolutionRate: number;
+  platformAverageResolutionHours: number;
+  platformMedianResolutionHours: number;
+  leaderboard: LeaderboardEntry[];
+}
+
+export interface OrganizationTransparencyProfile {
+  organizationId: number;
+  organizationName: string;
+  organizationType: string;
+  status: string;
+  ethosScore: number;
+  qualificationStatus: 'QUALIFIED' | 'PROVISIONAL';
+  resolutionRate: number;
+  averageResolutionHours: number;
+  medianResolutionHours: number;
+  totalComplaints: number;
+  eligibleComplaints: number;
+  activeComplaints: number;
+  resolvedComplaints: number;
+  rejectedComplaints: number;
+  complaintsByCategory: Record<string, number>;
+  complaintsByDepartment: Record<string, number>;
+  period: string;
+}
+
+/** GET /api/public/leaderboard — Public aggregate organization leaderboard */
+export async function getPublicLeaderboard(period?: string): Promise<LeaderboardEntry[]> {
+  const query = buildQuery({ period });
+  return request<LeaderboardEntry[]>(`/public/leaderboard${query}`);
+}
+
+/** GET /api/public/transparency — Public platform-wide transparency overview */
+export async function getPublicTransparency(period?: string): Promise<PublicTransparencySummary> {
+  const query = buildQuery({ period });
+  return request<PublicTransparencySummary>(`/public/transparency${query}`);
+}
+
+/** GET /api/public/organizations/{id}/transparency — Organization public transparency profile */
+export async function getOrganizationTransparencyProfile(
+  id: number | string,
+  period?: string
+): Promise<OrganizationTransparencyProfile> {
+  const query = buildQuery({ period });
+  return request<OrganizationTransparencyProfile>(`/public/organizations/${id}/transparency${query}`);
 }
 
 // Re-export ApiError so callers can instanceof-check it

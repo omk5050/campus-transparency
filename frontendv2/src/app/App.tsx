@@ -55,6 +55,7 @@ import {
   Terminal,
   Zap,
   Flag,
+  Trophy,
 } from "lucide-react";
 import {
   AreaChart,
@@ -123,6 +124,7 @@ import { OrganizationApplicationApply } from "./components/OrganizationApplicati
 import { SuperAdminApplications } from "./components/SuperAdminApplications";
 import { JoinCodeRegistration } from "./components/JoinCodeRegistration";
 import { JoinCodeManagement } from "./components/JoinCodeManagement";
+import { PublicTransparencyLeaderboard } from "./components/PublicTransparencyLeaderboard";
 
 // ─── Design constants ──────────────────────────────────────────────────────────
 const C = {
@@ -988,7 +990,8 @@ type OrgView =
   | "MODERATION"
   | "PLATFORM"
   | "JOIN_CODES"
-  | "ORG_APPLICATIONS";
+  | "ORG_APPLICATIONS"
+  | "LEADERBOARD";
 
 const NAV_MAIN: {
   id: OrgView;
@@ -1060,11 +1063,13 @@ function OrgSidebar({
       { id: "REPORTS", label: "My Complaints", icon: <FileText size={15} />, badge: unresolvedCount },
       { id: "SUBMIT", label: "Submit Complaint", icon: <Plus size={15} /> },
       { id: "TRACK", label: "Track a Report", icon: <Eye size={15} /> },
+      { id: "LEADERBOARD", label: "Leaderboard & Stats", icon: <Trophy size={15} /> },
     );
   } else if (isInvestigatorRole) {
     roleNavItems.push(
       { id: "REPORTS", label: "Assigned Cases", icon: <FileText size={15} />, badge: unresolvedCount },
       { id: "TRACK", label: "Track a Report", icon: <Eye size={15} /> },
+      { id: "LEADERBOARD", label: "Leaderboard & Stats", icon: <Trophy size={15} /> },
     );
   } else if (isSuperAdminRole) {
     roleNavItems.push(
@@ -1075,6 +1080,7 @@ function OrgSidebar({
       { id: "ADMIN", label: "Case Management", icon: <Shield size={15} />, badge: unresolvedCount },
       { id: "REPORTS", label: "All Complaints", icon: <FileText size={15} /> },
       { id: "TRACK", label: "Track a Report", icon: <Eye size={15} /> },
+      { id: "LEADERBOARD", label: "Leaderboard & Stats", icon: <Trophy size={15} /> },
     );
   } else {
     // Org Admin
@@ -1086,6 +1092,7 @@ function OrgSidebar({
       { id: "SETTINGS", label: "Org Settings", icon: <Settings size={15} /> },
       { id: "MODERATION", label: "Moderation Queue", icon: <Flag size={15} /> },
       { id: "TRACK", label: "Track a Report", icon: <Eye size={15} /> },
+      { id: "LEADERBOARD", label: "Leaderboard & Stats", icon: <Trophy size={15} /> },
     );
   }
 
@@ -1313,11 +1320,13 @@ function OverviewView({
   reports,
   onViewReports,
   onViewDetail,
+  onNavigateLeaderboard,
 }: {
   org: Organization;
   reports: Report[];
   onViewReports: () => void;
   onViewDetail: (id: string) => void;
+  onNavigateLeaderboard?: () => void;
 }) {
   const [liveMetrics, setLiveMetrics] = useState<OrganizationMetrics | null>(null);
 
@@ -1410,6 +1419,90 @@ function OverviewView({
       </div>
 
       <div className="px-8 py-6 space-y-6">
+        {/* Ethos Governance Banner */}
+        {liveMetrics?.ethosScore !== undefined && (
+          <div
+            className="p-5 border flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+            style={{
+              background: `linear-gradient(135deg, ${C.surface} 0%, ${C.surface2} 100%)`,
+              borderColor: C.border,
+            }}
+          >
+            <div className="flex items-center gap-4">
+              <div
+                className="w-12 h-12 rounded flex items-center justify-center font-mono font-bold text-lg"
+                style={{
+                  background:
+                    liveMetrics.ethosScore >= 80
+                      ? `${C.emerald}20`
+                      : liveMetrics.ethosScore >= 60
+                      ? `${C.cyan}20`
+                      : `${C.amber}20`,
+                  color:
+                    liveMetrics.ethosScore >= 80
+                      ? C.emerald
+                      : liveMetrics.ethosScore >= 60
+                      ? C.cyan
+                      : C.amber,
+                  border: `1px solid ${
+                    liveMetrics.ethosScore >= 80
+                      ? `${C.emerald}40`
+                      : liveMetrics.ethosScore >= 60
+                      ? `${C.cyan}40`
+                      : `${C.amber}40`
+                  }`,
+                }}
+              >
+                {liveMetrics.ethosScore.toFixed(0)}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs uppercase tracking-widest font-bold" style={{ color: C.text }}>
+                    Institutional Ethos Score: {liveMetrics.ethosScore.toFixed(1)} / 100
+                  </span>
+                  <span
+                    className="px-2 py-0.5 text-[9px] font-mono uppercase font-bold rounded"
+                    style={{
+                      background:
+                        liveMetrics.qualificationStatus === "QUALIFIED"
+                          ? `${C.emerald}15`
+                          : `${C.amber}15`,
+                      color:
+                        liveMetrics.qualificationStatus === "QUALIFIED"
+                          ? C.emerald
+                          : C.amber,
+                      border: `1px solid ${
+                        liveMetrics.qualificationStatus === "QUALIFIED"
+                          ? `${C.emerald}30`
+                          : `${C.amber}30`
+                      }`,
+                    }}
+                  >
+                    {liveMetrics.qualificationStatus === "QUALIFIED"
+                      ? "QUALIFIED TENANT"
+                      : "PROVISIONAL RATING"}
+                  </span>
+                </div>
+                <p className="font-mono text-xs mt-0.5" style={{ color: C.textSub }}>
+                  Resolution Rate: {liveMetrics.resolutionRate?.toFixed(1) ?? 0}% · Median Speed:{" "}
+                  {liveMetrics.medianResolutionHours ? `${liveMetrics.medianResolutionHours.toFixed(1)} hrs` : "N/A"}
+                </p>
+              </div>
+            </div>
+
+            {onNavigateLeaderboard && (
+              <button
+                onClick={onNavigateLeaderboard}
+                className="inline-flex items-center gap-1.5 px-4 py-2 border font-mono text-xs uppercase tracking-wider transition-colors hover:border-cyan-400 hover:text-cyan-400 flex-shrink-0"
+                style={{ borderColor: C.border, color: C.text }}
+              >
+                <Trophy size={14} className="text-amber-400" />
+                <span>Public Leaderboard →</span>
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Metrics row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
@@ -4867,10 +4960,13 @@ function OrgSettingsView({ org }: { org: Organization }) {
 }
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
-type AppState = "LOGIN" | "REGISTER" | "APPLY" | "SPACES" | "JOIN" | "ORG";
+type AppState = "LOGIN" | "REGISTER" | "APPLY" | "SPACES" | "JOIN" | "ORG" | "LEADERBOARD";
 
 function parseInitialRoute(): { appState: AppState; orgView?: OrgView } {
   const path = window.location.pathname;
+  if (path === '/leaderboard' || path === '/transparency') {
+    return { appState: 'LEADERBOARD' };
+  }
   if (path === '/organization/apply' || path === '/apply') {
     return { appState: 'APPLY' };
   }
@@ -4894,10 +4990,12 @@ function LoginView({
   onSuccess,
   onRegisterClick,
   onApplyClick,
+  onLeaderboardClick,
 }: {
   onSuccess: () => void;
   onRegisterClick: () => void;
   onApplyClick: () => void;
+  onLeaderboardClick: () => void;
 }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -5040,6 +5138,18 @@ function LoginView({
           >
             <span>Have an organization join code?</span>
             <span className="text-[10px] uppercase font-bold tracking-wider">Register →</span>
+          </button>
+          <button
+            type="button"
+            onClick={onLeaderboardClick}
+            className="w-full text-left py-2 px-3 border transition-colors hover:bg-white/[0.03] flex items-center justify-between"
+            style={{ borderColor: `${C.cyan}40`, background: `${C.cyan}0A`, color: C.cyan }}
+          >
+            <div className="flex items-center gap-2">
+              <Trophy size={13} className="text-cyan-400" />
+              <span>Explore Public Institutional Leaderboard</span>
+            </div>
+            <span className="text-[10px] uppercase font-bold tracking-wider">Rankings →</span>
           </button>
           <button
             type="button"
@@ -5415,6 +5525,13 @@ export default function App() {
           onSuccess={handleLoginSuccess}
           onRegisterClick={() => navigateTo("/register", "REGISTER")}
           onApplyClick={() => navigateTo("/organization/apply", "APPLY")}
+          onLeaderboardClick={() => navigateTo("/leaderboard", "LEADERBOARD")}
+        />
+      )}
+
+      {appState === "LEADERBOARD" && (
+        <PublicTransparencyLeaderboard
+          onBack={() => navigateTo(isAuthenticated() ? "/" : "/login", isAuthenticated() ? "SPACES" : "LOGIN")}
         />
       )}
 
@@ -5499,6 +5616,7 @@ export default function App() {
                 reports={reports}
                 onViewReports={() => setOrgView("REPORTS")}
                 onViewDetail={handleOpenDetail}
+                onNavigateLeaderboard={() => setOrgView("LEADERBOARD")}
               />
             )}
             {orgView === "REPORTS" && (
@@ -5579,6 +5697,12 @@ export default function App() {
               <SuperAdminApplications
                 isSuperAdmin={isSuperAdmin}
                 onNavigateHome={() => setOrgView("OVERVIEW")}
+              />
+            )}
+            {orgView === "LEADERBOARD" && (
+              <PublicTransparencyLeaderboard
+                onBack={() => setOrgView("OVERVIEW")}
+                initialOrgId={Number(currentOrg.id)}
               />
             )}
           </main>
