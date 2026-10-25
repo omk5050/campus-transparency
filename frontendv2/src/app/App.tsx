@@ -4964,7 +4964,7 @@ function OrgSettingsView({ org }: { org: Organization }) {
 }
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
-type AppState = "LOGIN" | "REGISTER" | "APPLY" | "SPACES" | "JOIN" | "ORG" | "LEADERBOARD" | "FORUM";
+type AppState = "LOGIN" | "REGISTER" | "APPLY" | "SPACES" | "JOIN" | "ORG" | "LEADERBOARD" | "FORUM" | "TRACK";
 
 function parseInitialRoute(): { appState: AppState; orgView?: OrgView } {
   const path = window.location.pathname;
@@ -4992,8 +4992,8 @@ function parseInitialRoute(): { appState: AppState; orgView?: OrgView } {
   if (path === '/admin/forum-governance') {
     return { appState: isAuthenticated() ? 'ORG' : 'LOGIN', orgView: 'FORUM_GOVERNANCE' };
   }
-  if (path === '/track') {
-    return { appState: isAuthenticated() ? 'ORG' : 'LOGIN', orgView: 'TRACK' };
+  if (path === '/track' || path.startsWith('/track')) {
+    return { appState: isAuthenticated() ? 'ORG' : 'TRACK', orgView: 'TRACK' };
   }
   return { appState: isAuthenticated() ? 'SPACES' : 'LOGIN' };
 }
@@ -5005,12 +5005,14 @@ function LoginView({
   onApplyClick,
   onLeaderboardClick,
   onForumClick,
+  onTrackClick,
 }: {
   onSuccess: () => void;
   onRegisterClick: () => void;
   onApplyClick: () => void;
   onLeaderboardClick: () => void;
   onForumClick: () => void;
+  onTrackClick: () => void;
 }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -5165,6 +5167,18 @@ function LoginView({
               <span>Explore Public Institutional Leaderboard</span>
             </div>
             <span className="text-[10px] uppercase font-bold tracking-wider">Rankings →</span>
+          </button>
+          <button
+            type="button"
+            onClick={onTrackClick}
+            className="w-full text-left py-2 px-3 border transition-colors hover:bg-white/[0.03] flex items-center justify-between"
+            style={{ borderColor: `${C.cyan}30`, color: C.text }}
+          >
+            <div className="flex items-center gap-2">
+              <Eye size={13} className="text-cyan-400" />
+              <span>Track an Anonymous Report</span>
+            </div>
+            <span className="text-[10px] uppercase font-bold tracking-wider text-cyan-400">Track →</span>
           </button>
           <button
             type="button"
@@ -5565,6 +5579,23 @@ export default function App() {
           onApplyClick={() => navigateTo("/organization/apply", "APPLY")}
           onLeaderboardClick={() => navigateTo("/leaderboard", "LEADERBOARD")}
           onForumClick={() => navigateTo("/forum", "FORUM")}
+          onTrackClick={() => navigateTo("/track", "TRACK", "TRACK")}
+        />
+      )}
+
+      {appState === "TRACK" && (
+        <TrackReportView
+          tracked={_tracked}
+          reports={reports}
+          onBack={() => navigateTo(isAuthenticated() ? "/" : "/login", isAuthenticated() ? "SPACES" : "LOGIN")}
+        />
+      )}
+
+      {appState === "ORG" && !currentOrg && orgView === "TRACK" && (
+        <TrackReportView
+          tracked={_tracked}
+          reports={reports}
+          onBack={() => navigateTo(isAuthenticated() ? "/" : "/login", isAuthenticated() ? "SPACES" : "LOGIN")}
         />
       )}
 
@@ -5635,8 +5666,16 @@ export default function App() {
             isSuperAdmin={isSuperAdmin}
             userRole={userProfile?.role}
             onView={(v) => {
-              setOrgView(v);
-              if (v !== "DETAIL") setSelectedReportId(null);
+              if (v === "TRACK") {
+                navigateTo("/track", "ORG", "TRACK");
+              } else if (v === "LEADERBOARD") {
+                navigateTo("/leaderboard", "ORG", "LEADERBOARD");
+              } else if (v === "FORUM") {
+                navigateTo("/forum", "ORG", "FORUM");
+              } else {
+                setOrgView(v);
+                if (v !== "DETAIL") setSelectedReportId(null);
+              }
             }}
             onSwitchOrg={() => {
               const next = _orgs.find(

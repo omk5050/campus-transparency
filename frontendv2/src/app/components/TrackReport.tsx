@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import {
   ArrowLeft, Search, Shield, Lock, Check, Clock, MessageSquare,
@@ -153,8 +153,101 @@ export function TrackReportView({ tracked, reports, onBack }: TrackReportProps) 
   const [localFeedback, setLocalFeedback] = useState<Record<string, ResolutionFeedback>>({});
   const [activeTab, setActiveTab] = useState<'overview' | 'communication' | 'privacy'>('overview');
 
-  const handleLookup = async () => {
-    const code = lookupCode.trim();
+  const updateUrl = (code?: string) => {
+    if (typeof window === 'undefined') return;
+    if (code) {
+      const url = `/track?code=${encodeURIComponent(code)}`;
+      if (window.location.pathname + window.location.search !== url) {
+        window.history.pushState({ trackingCode: code }, '', url);
+      }
+    } else {
+      if (window.location.pathname !== '/track' || window.location.search) {
+        window.history.pushState({}, '', '/track');
+      }
+    }
+  };
+
+  const getTrackingCodeFromUrl = () => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code') || params.get('trackingCode');
+    if (code) return code.trim();
+    const match = window.location.pathname.match(/^\/track\/([a-zA-Z0-9_-]+)/);
+    return match ? match[1].trim() : null;
+  };
+
+  const handleSelectTrackedCase = async (t: TrackedReport) => {
+    // 1. If trackingCode is present, attempt live backend lookup first
+    if (t.trackingCode) {
+      setLoading(true);
+      try {
+        const issueRes = await trackIssue(t.trackingCode);
+        const report = mapIssueToReport(issueRes);
+        setLiveReport(report);
+        setActiveReportId(report.id);
+        updateUrl(t.trackingCode);
+        return;
+      } catch {
+        // Fallback to local or synthesized report if offline or demo case
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    // 2. Check if already in reports
+    const found = reports.find(
+      r => r.id === t.reportId || (t.trackingCode && r.trackingCode?.toUpperCase() === t.trackingCode.toUpperCase())
+    );
+    if (found) {
+      setLiveReport(found);
+      setActiveReportId(found.id);
+      if (t.trackingCode) updateUrl(t.trackingCode);
+      return;
+    }
+
+    // 3. Synthesize safe Report from TrackedReport so the detail view always displays
+    const synthReport: Report = {
+      id: t.reportId,
+      orgId: '1',
+      title: t.title,
+      description: `Case tracking for ${t.title}. Currently in status: ${t.status.replace('_', ' ')}.`,
+      status: t.status,
+      priority: 'MEDIUM',
+      category: 'Campus Facilities',
+      department: 'Administration',
+      anonymousId: `ANON-${t.reportId.replace(/[^a-zA-Z0-9]/g, '').slice(-6)}`,
+      trackingCode: t.trackingCode,
+      createdAt: t.submittedAt,
+      updatedAt: t.lastUpdate,
+      slaDeadline: t.lastUpdate,
+      slaBreached: false,
+      voteCount: 0,
+      userVoted: false,
+      aiAnalysis: {
+        sentiment: 'NEUTRAL',
+        categoryMatch: true,
+        urgencyScore: 50,
+        duplicateConfidence: 0,
+        recommendedAction: 'Review case documentation and follow timeline updates.',
+      },
+      auditLog: [
+        {
+          id: `aud-${t.reportId}`,
+          action: 'STATUS_CHANGE',
+          actor: 'System',
+          timestamp: t.submittedAt,
+          details: `Report registered with tracking code ${t.trackingCode}`,
+        },
+      ],
+    };
+    setLiveReport(synthReport);
+    setActiveReportId(synthReport.id);
+    if (t.trackingCode) updateUrl(t.trackingCode);
+  };
+
+  const handleLookup = async (codeOverride?: string) => {
+    const raw = codeOverride ?? lookupCode;
+    const code = raw.trim();
     if (!code) return;
 
     setLoading(true);
@@ -165,13 +258,13 @@ export function TrackReportView({ tracked, reports, onBack }: TrackReportProps) 
       setLiveReport(report);
       setActiveReportId(report.id);
       setLookupCode('');
+      updateUrl(code);
       toast.success(`Found complaint: ${report.title}`);
     } catch {
       // 2. Fallback to local tracked items
       const found = tracked.find(t => t.trackingCode.toLowerCase() === code.toLowerCase());
       if (found) {
-        setLiveReport(null);
-        setActiveReportId(found.reportId);
+        await handleSelectTrackedCase(found);
         setLookupCode('');
       } else {
         toast.error(`No complaint found for tracking code "${code}".`);
@@ -179,6 +272,31 @@ export function TrackReportView({ tracked, reports, onBack }: TrackReportProps) 
     } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    const initialCode = getTrackingCodeFromUrl();
+    if (initialCode) {
+      handleLookup(initialCode);
+    }
+
+    const onPop = () => {
+      const poppedCode = getTrackingCodeFromUrl();
+      if (poppedCode) {
+        handleLookup(poppedCode);
+      } else {
+        setActiveReportId(null);
+        setLiveReport(null);
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const handleBackToList = () => {
+    setActiveReportId(null);
+    setLiveReport(null);
+    updateUrl();
   };
 
   const getMessagesForCase = (caseId: string): Message[] => {
@@ -239,11 +357,12 @@ export function TrackReportView({ tracked, reports, onBack }: TrackReportProps) 
                 autoFocus
               />
               <button
-                onClick={handleLookup}
-                className="flex items-center gap-2 px-5 py-3 font-mono text-xs uppercase tracking-widest"
+                onClick={() => handleLookup()}
+                disabled={loading}
+                className="flex items-center gap-2 px-5 py-3 font-mono text-xs uppercase tracking-widest cursor-pointer hover:opacity-90 transition-opacity disabled:opacity-50"
                 style={{ background: C.cyan, color: C.bg }}
               >
-                <Search size={13} /> Look Up
+                <Search size={13} /> {loading ? 'Checking…' : 'Look Up'}
               </button>
             </div>
           </div>
@@ -254,21 +373,24 @@ export function TrackReportView({ tracked, reports, onBack }: TrackReportProps) 
               <div className="font-mono text-[10px] uppercase tracking-widest mb-3" style={{ color: C.textDim }}>
                 Your Cases ({tracked.length})
               </div>
-              <div className="border" style={{ borderColor: C.border }}>
+              <div className="border divide-y" style={{ borderColor: C.border }}>
                 {tracked.map(t => (
                   <button
                     key={t.reportId}
-                    onClick={() => setActiveReportId(t.reportId)}
-                    className="w-full flex items-center gap-4 px-5 py-4 border-b last:border-b-0 text-left transition-colors hover:bg-white/[0.02]"
+                    type="button"
+                    onClick={() => handleSelectTrackedCase(t)}
+                    className="w-full flex items-center gap-4 px-5 py-4 text-left transition-all duration-150 cursor-pointer group hover:bg-white/[0.04]"
                     style={{ borderColor: C.border }}
+                    title={`Open case ${t.title}`}
                   >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                         <span
-                          className="font-mono text-[10px] px-2 py-0.5 uppercase tracking-widest"
+                          className="font-mono text-[10px] px-2 py-0.5 uppercase tracking-widest font-semibold"
                           style={{
                             color: t.status === 'RESOLVED' ? C.emerald : t.status === 'IN_PROGRESS' ? C.cyan : C.amber,
-                            background: `${t.status === 'RESOLVED' ? C.emerald : t.status === 'IN_PROGRESS' ? C.cyan : C.amber}0C`,
+                            background: `${t.status === 'RESOLVED' ? C.emerald : t.status === 'IN_PROGRESS' ? C.cyan : C.amber}14`,
+                            border: `1px solid ${t.status === 'RESOLVED' ? C.emerald : t.status === 'IN_PROGRESS' ? C.cyan : C.amber}30`,
                           }}
                         >
                           {t.status.replace('_', ' ')}
@@ -282,12 +404,31 @@ export function TrackReportView({ tracked, reports, onBack }: TrackReportProps) 
                           </span>
                         )}
                       </div>
-                      <div className="font-mono text-xs" style={{ color: C.text }}>{t.title}</div>
-                      <div className="font-mono text-[10px] mt-0.5" style={{ color: C.textDim }}>
-                        {t.reportId} · {t.trackingCode}
+                      <div className="font-mono text-xs font-semibold group-hover:text-cyan-400 transition-colors truncate" style={{ color: C.text }}>
+                        {t.title}
+                      </div>
+                      <div className="font-mono text-[10px] mt-1 flex items-center gap-2 flex-wrap" style={{ color: C.textDim }}>
+                        <span className="group-hover:text-zinc-300 transition-colors">{t.reportId}</span>
+                        <span>·</span>
+                        <span className="text-cyan-400/90 font-mono font-medium">{t.trackingCode}</span>
+                        <span>·</span>
+                        <span>Updated {format(new Date(t.lastUpdate), 'dd MMM, HH:mm')}</span>
                       </div>
                     </div>
-                    <ChevronRight size={14} style={{ color: C.textDim }} />
+                    <div
+                      className="p-2 -mr-2 rounded transition-transform duration-150 group-hover:translate-x-1 flex-shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectTrackedCase(t);
+                      }}
+                      title="Open report"
+                    >
+                      <ChevronRight
+                        size={16}
+                        className="transition-colors group-hover:text-cyan-400"
+                        style={{ color: C.textDim }}
+                      />
+                    </div>
                   </button>
                 ))}
               </div>
@@ -318,8 +459,8 @@ export function TrackReportView({ tracked, reports, onBack }: TrackReportProps) 
       <div className="sticky top-0 z-10 border-b" style={{ background: C.bg, borderColor: C.border }}>
         <div className="flex items-center justify-between px-6 py-3">
           <button
-            onClick={() => setActiveReportId(null)}
-            className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest transition-opacity hover:opacity-70"
+            onClick={handleBackToList}
+            className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest transition-opacity hover:opacity-70 cursor-pointer"
             style={{ color: C.textSub }}
           >
             <ArrowLeft size={13} /> My Reports
