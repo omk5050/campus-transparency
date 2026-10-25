@@ -1,23 +1,23 @@
 package com.campus.transparency.api.issue;
 
+import com.campus.transparency.application.issue.AnonymousTagService;
 import com.campus.transparency.application.issue.IssueCommandService;
 import com.campus.transparency.application.issue.IssueQueryService;
-import com.campus.transparency.application.issue.AnonymousTagService;
 import com.campus.transparency.domain.issue.Issue;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/issues")
-@Validated
 public class IssueController {
 
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(IssueController.class);
+    private static final Logger log = LoggerFactory.getLogger(IssueController.class);
 
     private final IssueCommandService commandService;
     private final IssueQueryService queryService;
@@ -41,7 +41,6 @@ public class IssueController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('STUDENT')")
     public IssueResponse create(@Valid @RequestBody CreateIssueRequest request) {
-        log.info("Student {} creating new issue titled '{}'", request.reporterHash(), request.title());
         Issue issue = commandService.create(
                 request.title(),
                 request.description(),
@@ -49,8 +48,8 @@ public class IssueController {
                 request.category(),
                 request.department()
         );
-        String alias = tagService.generateAlias(issue.getReporterHash(), issue.getId());
-        return IssueResponse.from(issue, alias);
+        log.info("Student created new issue titled '{}' (pseudonym: {})", issue.getTitle(), issue.getReporterAlias());
+        return IssueResponse.from(issue);
     }
 
     @PostMapping("/{id}/report")
@@ -64,7 +63,7 @@ public class IssueController {
     @PostMapping("/{id}/start")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('ADMIN')")
-    public void start(@PathVariable Long id) {
+    public void startProgress(@PathVariable Long id) {
         log.info("Admin starting progress on issue {}", id);
         commandService.startProgress(id);
     }
@@ -93,6 +92,14 @@ public class IssueController {
         commandService.hide(id);
     }
 
+    @PostMapping("/{id}/unhide")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('ADMIN')")
+    public void unhide(@PathVariable Long id) {
+        log.info("Admin unhiding issue {}", id);
+        commandService.unhide(id);
+    }
+
     @PostMapping("/{id}/assign")
     @PreAuthorize("hasRole('ADMIN')")
     public IssueResponse assign(
@@ -103,7 +110,7 @@ public class IssueController {
         String actor = principal != null ? principal.getName() : "admin";
         log.info("Admin {} assigning issue {} to user {} (dept: {})", actor, id, request.userId(), request.department());
         Issue issue = commandService.assign(id, request.userId(), request.department(), actor);
-        return IssueResponse.from(issue, tagService.generateAlias(issue.getReporterHash(), issue.getId()));
+        return IssueResponse.from(issue);
     }
 
     @PostMapping("/{id}/unassign")
@@ -115,7 +122,7 @@ public class IssueController {
         String actor = principal != null ? principal.getName() : "admin";
         log.info("Admin {} unassigning issue {}", actor, id);
         Issue issue = commandService.unassign(id, actor);
-        return IssueResponse.from(issue, tagService.generateAlias(issue.getReporterHash(), issue.getId()));
+        return IssueResponse.from(issue);
     }
 
     @PostMapping("/{id}/upvote")
@@ -157,7 +164,7 @@ public class IssueController {
             @RequestParam(defaultValue = "10") int size
     ) {
         return queryService.getPublicIssues(status, department, startDate, endDate, PageRequest.of(page, size))
-                .map(issue -> IssueResponse.from(issue, tagService.generateAlias(issue.getReporterHash(), issue.getId())));
+                .map(IssueResponse::from);
     }
 
     @GetMapping("/admin")
@@ -173,7 +180,7 @@ public class IssueController {
             @RequestParam(defaultValue = "10") int size
     ) {
         return queryService.getAllIssuesForAdmin(status, department, assignedTo, unassigned, startDate, endDate, PageRequest.of(page, size))
-                .map(issue -> IssueResponse.from(issue, tagService.generateAlias(issue.getReporterHash(), issue.getId())));
+                .map(IssueResponse::from);
     }
 
     @GetMapping("/assignees")
@@ -186,13 +193,12 @@ public class IssueController {
     @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
     public IssueResponse getById(@PathVariable Long id) {
         Issue issue = queryService.getById(id);
-        return IssueResponse.from(issue, tagService.generateAlias(issue.getReporterHash(), issue.getId()));
+        return IssueResponse.from(issue);
     }
 
     @GetMapping("/track/{trackingCode}")
     public IssueResponse getByTrackingCode(@PathVariable String trackingCode) {
         Issue issue = queryService.getByTrackingCode(trackingCode);
-        return IssueResponse.forPublicTracking(issue, tagService.generateAlias(issue.getReporterHash(), issue.getId()));
+        return IssueResponse.forPublicTracking(issue);
     }
 }
-

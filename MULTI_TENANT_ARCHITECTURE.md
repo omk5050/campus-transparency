@@ -270,5 +270,27 @@ To support thorough and ethical complaint investigations, ETHOS provides a stric
    - All collaboration actions are permanently audited in `audit_logs` (`INTERNAL_NOTE_CREATED`, `INTERNAL_NOTE_UPDATED`, `INTERNAL_NOTE_DELETED`, `ISSUE_MESSAGE_SENT`, `ISSUE_MESSAGE_UPDATED`, `ISSUE_MESSAGE_DELETED`).
    - Records metadata and entity IDs without exposing sensitive content in audit rows.
 
+---
 
+## 11. Phase 2.7 — Complaint-Specific Privacy-Preserving Pseudonyms & Anti-Correlation Architecture
 
+### A. The Threat Model & The Problem of Account-Wide Hashes
+In traditional reporting systems, anonymous identities are frequently implemented as fixed user hashes (e.g. `SHA-256(user_id)` or deterministic permutations). This creates severe vulnerabilities:
+1. **Cross-Report Linkage (Correlation Attacks):** If User X files three distinct complaints, any actor observing the database or feed can link all three complaints to the same individual because they share the same hash or pseudonym.
+2. **Whistleblower Deanonymization:** By linking distinct complaints across departments, an adversary can triangulate a complainant's schedule, identity, and specific course/dormitory affiliations.
+3. **Internal Database Exploitation:** Storing client-supplied or account-derived identifiers in the database allows anyone with read/replica access to perform grouping queries (`SELECT * FROM issues WHERE reporter_hash = '...'`).
+
+### B. Complaint-Specific Isolation Guarantees
+To achieve true zero-knowledge complaint privacy:
+1. **Per-Complaint Randomization:**
+   - Every submitted issue receives a freshly generated, cryptographically random pseudonym formatted as `Complainant #XXXX` (e.g., `Complainant #8F4C`).
+   - Uses `SecureRandom` with 16 bits of entropy (65,536 distinct codes per tenant) to prevent collision-based guessing.
+   - If Student A files two complaints 30 seconds apart, Complaint 1 is `Complainant #8F4C` and Complaint 2 is `Complainant #3B21`. There is zero mathematical or visual relationship between them.
+2. **Persistent Storage in Flyway `V11`:**
+   - Pseudonyms are stored permanently in `issues.reporter_alias VARCHAR(64)` and indexed (`idx_issues_reporter_alias`).
+   - Pre-existing issues were backfilled cleanly with deterministic pseudo-random values (`Complainant #' || UPPER(SUBSTRING(MD5(...), 1, 4))`).
+3. **Decoupled Internal Hash Generation:**
+   - `reporterHash` in `CreateIssueRequest` is optional.
+   - Even if a legacy client passes a fixed hash, the server generates an isolated internal hash token (`anon_<random_uuid>`) ensuring that no two database rows share a linkable hash.
+4. **Zero-Knowledge Application Logging:**
+   - Log statements record only the issue title and the complaint-specific pseudonym (e.g. `Student created new issue titled '...' (pseudonym: Complainant #8F4C)`), never raw user credentials or fixed identifiers.

@@ -1,5 +1,6 @@
 package com.campus.transparency.domain.issue;
 
+import com.campus.transparency.application.issue.AnonymousTagService;
 import com.campus.transparency.domain.base.BaseEntity;
 import com.campus.transparency.domain.lifecycle.IssueLifecyclePolicy;
 import com.campus.transparency.domain.user.User;
@@ -22,6 +23,10 @@ public class Issue extends BaseEntity {
     // Controlled anonymity: opaque identifier, never exposed
     @Column(nullable = false, updatable = false, length = 64)
     private String reporterHash;
+
+    // Complaint-specific privacy-preserving pseudonym (e.g. "Complainant #8F4C")
+    @Column(name = "reporter_alias", nullable = false, length = 64)
+    private String reporterAlias;
 
     // Moderation visibility
     @Column(nullable = false)
@@ -60,14 +65,23 @@ public class Issue extends BaseEntity {
     }
 
     public Issue(String title, String description, String reporterHash, String category, String department, com.campus.transparency.domain.organization.Organization organization) {
+        this(title, description, reporterHash, category, department, organization, null);
+    }
+
+    public Issue(String title, String description, String reporterHash, String category, String department, com.campus.transparency.domain.organization.Organization organization, String reporterAlias) {
         this.title = title;
         this.description = description;
-        this.reporterHash = reporterHash;
+        this.reporterHash = (reporterHash != null && !reporterHash.isBlank())
+                ? reporterHash
+                : AnonymousTagService.generateIsolatedReporterHash();
         this.status = IssueStatus.REPORTED;
         this.category = (category != null && !category.isBlank()) ? category : "Infrastructure";
         this.department = (department != null && !department.isBlank()) ? department : "Facilities & Operations";
         this.trackingCode = "CMP-" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         this.organization = organization;
+        this.reporterAlias = (reporterAlias != null && !reporterAlias.isBlank())
+                ? reporterAlias
+                : AnonymousTagService.generateComplaintPseudonym();
     }
 
     //---DOMAIN-ENFORCED LIFECYCLE---
@@ -128,6 +142,10 @@ public class Issue extends BaseEntity {
 
     public String getReporterHash() {
         return reporterHash;
+    }
+
+    public String getReporterAlias() {
+        return reporterAlias;
     }
 
     public String getTrackingCode() {

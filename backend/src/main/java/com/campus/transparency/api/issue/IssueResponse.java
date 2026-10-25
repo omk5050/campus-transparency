@@ -21,7 +21,14 @@ public record IssueResponse(
         Instant updatedAt
 ) {
 
+    public static IssueResponse from(Issue issue) {
+        return from(issue, issue.getReporterAlias());
+    }
+
     public static IssueResponse from(Issue issue, String reporterAlias) {
+        String effectiveAlias = (reporterAlias != null && !reporterAlias.isBlank())
+                ? reporterAlias
+                : (issue.getReporterAlias() != null ? issue.getReporterAlias() : "Complainant #0000");
         return new IssueResponse(
                 issue.getId(),
                 issue.getTitle(),
@@ -29,7 +36,7 @@ public record IssueResponse(
                 issue.getStatus(),
                 issue.isHidden(),
                 issue.getVoteCount(),
-                reporterAlias,
+                effectiveAlias,
                 issue.getTrackingCode(),
                 issue.getCategory(),
                 issue.getDepartment(),
@@ -39,7 +46,14 @@ public record IssueResponse(
         );
     }
 
+    public static IssueResponse forPublicTracking(Issue issue) {
+        return forPublicTracking(issue, issue.getReporterAlias());
+    }
+
     public static IssueResponse forPublicTracking(Issue issue, String reporterAlias) {
+        String effectiveAlias = (reporterAlias != null && !reporterAlias.isBlank())
+                ? reporterAlias
+                : (issue.getReporterAlias() != null ? issue.getReporterAlias() : "Complainant #0000");
         return new IssueResponse(
                 issue.getId(),
                 issue.getTitle(),
@@ -47,7 +61,7 @@ public record IssueResponse(
                 issue.getStatus(),
                 false,
                 issue.getVoteCount(),
-                reporterAlias,
+                effectiveAlias,
                 issue.getTrackingCode(),
                 issue.getCategory(),
                 issue.getDepartment(),
