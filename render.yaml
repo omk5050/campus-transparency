@@ -30,8 +30,9 @@ services:
   # ─────────────────────────────────────────────────────────────────────────────
   # 2. ETHOS Frontend Static Site (React 18 / Vite / Tailwind)
   # ─────────────────────────────────────────────────────────────────────────────
-  - type: static
+  - type: web
     name: ethos-frontend
+    runtime: static
     buildCommand: cd frontendv2 && npm install && npm run build
     staticPublishPath: ./frontendv2/dist
     envVars:

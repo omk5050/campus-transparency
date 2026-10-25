@@ -60,7 +60,8 @@ This runbook details the production deployment architecture, environment variabl
 ---
 
 ### 2. Frontend Service (`ethos-frontend`)
-- **Host**: Render Static Site (or Render Web Service)
+- **Host**: Render Web Service (Static Site)
+- **Blueprint Spec**: `type: web`, `runtime: static`
 - **Root Directory**: `frontendv2`
 - **Build Command**: `cd frontendv2 && npm install && npm run build`
 - **Publish Directory**: `frontendv2/dist`
