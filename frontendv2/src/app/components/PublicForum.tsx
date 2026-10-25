@@ -31,6 +31,8 @@ import { ForumPostDetailView } from './ForumPostDetail';
 interface PublicForumProps {
   onBack?: () => void;
   isAdmin?: boolean;
+  isSuperAdmin?: boolean;
+  userRole?: string;
   initialPostId?: number;
 }
 
@@ -68,7 +70,7 @@ const CATEGORY_STYLES: Record<string, { bg: string; text: string; border: string
   FEEDBACK: { bg: 'rgba(244, 63, 94, 0.1)', text: '#F43F5E', border: 'rgba(244, 63, 94, 0.3)' },
 };
 
-export function PublicForum({ onBack, isAdmin, initialPostId }: PublicForumProps) {
+export function PublicForum({ onBack, isAdmin, isSuperAdmin, userRole, initialPostId }: PublicForumProps) {
   const [postsPage, setPostsPage] = useState<SpringPage<ForumPostSummary> | null>(null);
   const [selectedPostId, setSelectedPostId] = useState<number | null>(initialPostId ?? null);
   const [category, setCategory] = useState('ALL');
@@ -78,6 +80,7 @@ export function PublicForum({ onBack, isAdmin, initialPostId }: PublicForumProps
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const authenticated = isAuthenticated();
+  const canCreate = Boolean(isSuperAdmin || userRole === 'SUPER_ADMIN');
 
   const loadPosts = async () => {
     setLoading(true);
@@ -165,7 +168,7 @@ export function PublicForum({ onBack, isAdmin, initialPostId }: PublicForumProps
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            {authenticated ? (
+            {canCreate ? (
               <button
                 onClick={() => setIsCreateModalOpen(true)}
                 className="px-5 py-2.5 rounded-lg font-mono text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-transform hover:scale-[1.02]"
@@ -174,14 +177,7 @@ export function PublicForum({ onBack, isAdmin, initialPostId }: PublicForumProps
                 <Plus size={16} />
                 <span>Start Discussion</span>
               </button>
-            ) : (
-              <div
-                className="p-3 border rounded text-xs font-mono text-center"
-                style={{ background: C.surface3, borderColor: C.border, color: C.textSub }}
-              >
-                <span>Sign in to post discussions & replies</span>
-              </div>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
@@ -346,14 +342,16 @@ export function PublicForum({ onBack, isAdmin, initialPostId }: PublicForumProps
         </div>
       )}
 
-      {/* Create Modal */}
-      <CreateForumPostModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onSuccess={(created) => {
-          setSelectedPostId(created.id);
-        }}
-      />
+      {/* Create Modal - SUPER_ADMIN only */}
+      {canCreate && (
+        <CreateForumPostModal
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          onSuccess={(created) => {
+            setSelectedPostId(created.id);
+          }}
+        />
+      )}
     </div>
   );
 }

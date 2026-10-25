@@ -154,8 +154,9 @@ public class IssueController {
        ========================= */
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN', 'INVESTIGATOR', 'SUPER_ADMIN')")
     public Page<IssueResponse> publicFeed(
+            @RequestParam(required = false) Long organizationId,
             @RequestParam(required = false) com.campus.transparency.domain.issue.IssueStatus status,
             @RequestParam(required = false) String department,
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.Instant startDate,
@@ -163,13 +164,14 @@ public class IssueController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        return queryService.getPublicIssues(status, department, startDate, endDate, PageRequest.of(page, size))
+        return queryService.getPublicIssues(organizationId, status, department, startDate, endDate, PageRequest.of(page, size))
                 .map(IssueResponse::from);
     }
 
     @GetMapping("/admin")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public Page<IssueResponse> adminFeed(
+            @RequestParam(required = false) Long organizationId,
             @RequestParam(required = false) com.campus.transparency.domain.issue.IssueStatus status,
             @RequestParam(required = false) String department,
             @RequestParam(required = false) Long assignedTo,
@@ -179,7 +181,7 @@ public class IssueController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        return queryService.getAllIssuesForAdmin(status, department, assignedTo, unassigned, startDate, endDate, PageRequest.of(page, size))
+        return queryService.getAllIssuesForAdmin(organizationId, status, department, assignedTo, unassigned, startDate, endDate, PageRequest.of(page, size))
                 .map(IssueResponse::from);
     }
 
@@ -205,8 +207,8 @@ public class IssueController {
 
     @GetMapping("/assignees")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public java.util.List<AssignedUserResponse> getAssignees() {
-        return queryService.getAssignableUsers();
+    public java.util.List<AssignedUserResponse> getAssignees(@RequestParam(required = false) Long organizationId) {
+        return queryService.getAssignableUsers(organizationId);
     }
 
     @GetMapping("/{id}")

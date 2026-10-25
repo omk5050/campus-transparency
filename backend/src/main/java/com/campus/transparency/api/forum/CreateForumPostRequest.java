@@ -12,5 +12,11 @@ public record CreateForumPostRequest(
         @Size(max = 10000, message = "Content cannot exceed 10000 characters")
         String content,
 
-        String category
-) {}
+        String category,
+
+        Long organizationId
+) {
+    public CreateForumPostRequest(String title, String content, String category) {
+        this(title, content, category, null);
+    }
+}

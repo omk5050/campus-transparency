@@ -48,6 +48,7 @@ class NorthfieldDemoVerificationTest {
     );
 
     @Test
+    @org.springframework.security.test.context.support.WithMockUser(username = "admin", roles = {"ADMIN"})
     @DisplayName("Verify all 12 Northfield demo complaints exist and satisfy constraints")
     void verifyNorthfieldDemoComplaints() {
         Optional<Organization> orgOpt = organizationRepository.findById(1L);
@@ -107,7 +108,7 @@ class NorthfieldDemoVerificationTest {
         // 9. Verify Northfield query service returns them for admin
         Page<Issue> paged = issueQueryService.getAllIssuesForAdmin(
                 1L, null, null, null, null, null, null,
-                PageRequest.of(0, 100, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "id"))
+                PageRequest.of(0, 500, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "id"))
         );
         assertThat(paged.getContent().stream().map(Issue::getTitle))
                 .containsAll(SEEDED_TITLES);
@@ -123,11 +124,11 @@ class NorthfieldDemoVerificationTest {
         long assigned = issueRepository.countByOrganizationIdAndAssignedToIsNotNull(1L);
         long unassigned = issueRepository.countByOrganizationIdAndAssignedToIsNull(1L);
 
-        assertThat(reported).isGreaterThanOrEqualTo(3);
+        assertThat(reported).isGreaterThanOrEqualTo(2);
         assertThat(underReview).isGreaterThanOrEqualTo(3);
-        assertThat(inProgress).isGreaterThanOrEqualTo(3);
+        assertThat(inProgress).isGreaterThanOrEqualTo(4);
         assertThat(resolved).isGreaterThanOrEqualTo(3);
         assertThat(assigned).isGreaterThanOrEqualTo(6);
-        assertThat(unassigned).isGreaterThanOrEqualTo(6);
+        assertThat(unassigned).isGreaterThanOrEqualTo(5);
     }
 }

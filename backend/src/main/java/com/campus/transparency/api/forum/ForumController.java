@@ -25,19 +25,21 @@ public class ForumController {
 
     @PostMapping("/posts")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ForumPostDetailResponse createPost(@Valid @RequestBody CreateForumPostRequest request) {
         return forumService.createPost(request);
     }
 
     @GetMapping("/posts")
     public Page<ForumPostSummaryResponse> getVisiblePosts(
+            @RequestParam(value = "organizationId", required = false) Long organizationId,
             @RequestParam(value = "category", required = false) String category,
             @RequestParam(value = "search", required = false) String search,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "20") int size
     ) {
         Pageable pageable = PageRequest.of(page, Math.min(size, 100), Sort.by(Sort.Direction.DESC, "createdAt"));
-        return forumService.getVisiblePostsForCurrentOrg(category, search, pageable);
+        return forumService.getVisiblePostsForCurrentOrg(organizationId, category, search, pageable);
     }
 
     @GetMapping("/posts/{postId}")

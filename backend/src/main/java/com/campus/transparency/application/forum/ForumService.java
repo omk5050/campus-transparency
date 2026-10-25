@@ -122,7 +122,25 @@ public class ForumService {
     @Transactional
     public ForumPostDetailResponse createPost(CreateForumPostRequest request) {
         User author = currentUserService.getCurrentUser();
-        Organization organization = currentUserService.getCurrentOrganization();
+        if (author.getRole() != Role.SUPER_ADMIN) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Only SUPER_ADMIN is permitted to create forum posts"
+            );
+        }
+
+        Organization organization;
+        if (request.organizationId() != null) {
+            organization = organizationRepository.findById(request.organizationId())
+                    .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException(
+                            "Organization not found with id: " + request.organizationId()));
+        } else if (author.getOrganization() != null) {
+            organization = author.getOrganization();
+        } else {
+            organization = organizationRepository.findAll().stream()
+                    .filter(o -> o.getStatus() == com.campus.transparency.domain.organization.OrganizationStatus.ACTIVE)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("No active organization found"));
+        }
 
         // Enforce anti-spam rate limiting
         rateLimiter.checkPostRateLimit(author.getUsername());
@@ -169,8 +187,23 @@ public class ForumService {
             String search,
             Pageable pageable
     ) {
+        return getVisiblePostsForCurrentOrg(null, categoryStr, search, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ForumPostSummaryResponse> getVisiblePostsForCurrentOrg(
+            Long requestedOrgId,
+            String categoryStr,
+            String search,
+            Pageable pageable
+    ) {
         User user = currentUserService.getCurrentUser();
-        Organization org = currentUserService.getCurrentOrganization();
+        Long orgId;
+        if (user.getRole() == Role.SUPER_ADMIN) {
+            orgId = requestedOrgId;
+        } else {
+            orgId = currentUserService.getCurrentOrganizationId();
+        }
 
         ForumPostCategory category = null;
         if (categoryStr != null && !categoryStr.trim().isEmpty()) {
@@ -179,10 +212,14 @@ public class ForumService {
 
         Specification<ForumPost> spec = Specification.where(
                 ForumPostSpecification.hasStatusIn(List.of(ForumPostStatus.PUBLISHED, ForumPostStatus.LOCKED))
-        )
-        .and(ForumPostSpecification.belongsToOrganization(org.getId()))
-        .and(ForumPostSpecification.hasCategory(category))
-        .and(ForumPostSpecification.containsText(search));
+        );
+
+        if (orgId != null) {
+            spec = spec.and(ForumPostSpecification.belongsToOrganization(orgId));
+        }
+
+        spec = spec.and(ForumPostSpecification.hasCategory(category))
+                .and(ForumPostSpecification.containsText(search));
 
         Page<ForumPost> posts = postRepository.findAll(spec, pageable);
 

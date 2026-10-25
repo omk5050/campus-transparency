@@ -47,25 +47,40 @@ public class IssueQueryService {
         this.currentUserService = currentUserService;
     }
 
+    public Long resolveAuthorizedOrganizationId(Long requestedOrgId) {
+        User currentUser = null;
+        try {
+            currentUser = currentUserService.getCurrentUser();
+        } catch (Exception e) {
+            // Unauthenticated caller (e.g. public queries)
+            return requestedOrgId;
+        }
+        if (currentUser.getRole() == Role.SUPER_ADMIN) {
+            return requestedOrgId;
+        }
+        Long userOrgId = currentUserService.getCurrentOrganizationId();
+        if (requestedOrgId != null && !requestedOrgId.equals(userOrgId)) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Cross-tenant access denied: cannot access organization " + requestedOrgId
+            );
+        }
+        return userOrgId;
+    }
+
     @Transactional(readOnly = true)
     public Page<Issue> getPublicIssues(IssueStatus status, Instant startDate, Instant endDate, Pageable pageable) {
-        return getPublicIssues(status, null, startDate, endDate, pageable);
+        return getPublicIssues(null, status, null, startDate, endDate, pageable);
     }
 
     @Transactional(readOnly = true)
     public Page<Issue> getPublicIssues(IssueStatus status, String department, Instant startDate, Instant endDate, Pageable pageable) {
-        Long orgId = null;
-        try {
-            orgId = currentUserService.getCurrentOrganizationId();
-        } catch (Exception e) {
-            // Fallback for non-authenticated contexts
-        }
-        return getPublicIssues(orgId, status, department, startDate, endDate, pageable);
+        return getPublicIssues(null, status, department, startDate, endDate, pageable);
     }
 
     @Transactional(readOnly = true)
-    public Page<Issue> getPublicIssues(Long organizationId, IssueStatus status, String department, Instant startDate, Instant endDate, Pageable pageable) {
-        Specification<Issue> spec = Specification.where(IssueSpecification.belongsToOrganization(organizationId))
+    public Page<Issue> getPublicIssues(Long requestedOrganizationId, IssueStatus status, String department, Instant startDate, Instant endDate, Pageable pageable) {
+        Long orgId = resolveAuthorizedOrganizationId(requestedOrganizationId);
+        Specification<Issue> spec = Specification.where(IssueSpecification.belongsToOrganization(orgId))
                 .and(IssueSpecification.isNotHidden())
                 .and(IssueSpecification.hasStatus(status))
                 .and(IssueSpecification.hasDepartment(department))
@@ -76,7 +91,7 @@ public class IssueQueryService {
 
     @Transactional(readOnly = true)
     public Page<Issue> getAllIssuesForAdmin(IssueStatus status, Instant startDate, Instant endDate, Pageable pageable) {
-        return getAllIssuesForAdmin(status, null, null, null, startDate, endDate, pageable);
+        return getAllIssuesForAdmin(null, status, null, null, null, startDate, endDate, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -89,18 +104,12 @@ public class IssueQueryService {
             Instant endDate,
             Pageable pageable
     ) {
-        Long orgId = null;
-        try {
-            orgId = currentUserService.getCurrentOrganizationId();
-        } catch (Exception e) {
-            // Fallback for non-authenticated contexts
-        }
-        return getAllIssuesForAdmin(orgId, status, department, assignedTo, unassigned, startDate, endDate, pageable);
+        return getAllIssuesForAdmin(null, status, department, assignedTo, unassigned, startDate, endDate, pageable);
     }
 
     @Transactional(readOnly = true)
     public Page<Issue> getAllIssuesForAdmin(
-            Long organizationId,
+            Long requestedOrganizationId,
             IssueStatus status,
             String department,
             Long assignedTo,
@@ -109,7 +118,8 @@ public class IssueQueryService {
             Instant endDate,
             Pageable pageable
     ) {
-        Specification<Issue> spec = Specification.where(IssueSpecification.belongsToOrganization(organizationId))
+        Long orgId = resolveAuthorizedOrganizationId(requestedOrganizationId);
+        Specification<Issue> spec = Specification.where(IssueSpecification.belongsToOrganization(orgId))
                 .and(IssueSpecification.hasStatus(status))
                 .and(IssueSpecification.hasDepartment(department))
                 .and(IssueSpecification.createdAfter(startDate))
@@ -126,24 +136,19 @@ public class IssueQueryService {
 
     @Transactional(readOnly = true)
     public List<AssignedUserResponse> getAssignableUsers() {
-        Long orgId = null;
-        try {
-            orgId = currentUserService.getCurrentOrganizationId();
-        } catch (Exception e) {
-            // Fallback
-        }
-        return getAssignableUsers(orgId);
+        return getAssignableUsers(null);
     }
 
     @Transactional(readOnly = true)
-    public List<AssignedUserResponse> getAssignableUsers(Long organizationId) {
+    public List<AssignedUserResponse> getAssignableUsers(Long requestedOrganizationId) {
+        Long orgId = resolveAuthorizedOrganizationId(requestedOrganizationId);
         List<Role> assignableRoles = List.of(Role.ADMIN, Role.INVESTIGATOR);
-        if (organizationId == null) {
+        if (orgId == null) {
             return userRepository.findByRoleIn(assignableRoles).stream()
                     .map(AssignedUserResponse::from)
                     .toList();
         }
-        return userRepository.findByRoleInAndOrganizationId(assignableRoles, organizationId).stream()
+        return userRepository.findByRoleInAndOrganizationId(assignableRoles, orgId).stream()
                 .map(AssignedUserResponse::from)
                 .toList();
     }
@@ -168,34 +173,31 @@ public class IssueQueryService {
 
     @Transactional(readOnly = true)
     public Issue getById(Long id) {
-        Long orgId = null;
-        try {
-            orgId = currentUserService.getCurrentOrganizationId();
-        } catch (Exception e) {
-            // Fallback
+        Issue issue = issueRepository.findById(id)
+                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Issue not found with id: " + id));
+
+        User currentUser = currentUserService.getCurrentUser();
+        if (currentUser.getRole() == Role.SUPER_ADMIN) {
+            return issue;
         }
-        return getById(id, orgId);
+
+        Long userOrgId = currentUserService.getCurrentOrganizationId();
+        if (issue.getOrganization() == null || !issue.getOrganization().getId().equals(userOrgId)) {
+            throw new jakarta.persistence.EntityNotFoundException("Issue not found with id: " + id);
+        }
+
+        if (currentUser.getRole() == Role.STUDENT) {
+            if (issue.getReporter() == null || !issue.getReporter().getId().equals(currentUser.getId())) {
+                throw new jakarta.persistence.EntityNotFoundException("Issue not found with id: " + id);
+            }
+        }
+
+        return issue;
     }
 
     @Transactional(readOnly = true)
     public Issue getById(Long id, Long organizationId) {
-        Issue issue = issueRepository.findById(id)
-                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Issue not found with id: " + id));
-        if (organizationId != null && (issue.getOrganization() == null || !issue.getOrganization().getId().equals(organizationId))) {
-            throw new jakarta.persistence.EntityNotFoundException("Issue not found with id: " + id);
-        }
-        try {
-            User currentUser = currentUserService.getCurrentUser();
-            if (currentUser != null && currentUser.getRole() == Role.STUDENT) {
-                if (issue.getReporter() == null || !issue.getReporter().getId().equals(currentUser.getId())) {
-                    throw new jakarta.persistence.EntityNotFoundException("Issue not found with id: " + id);
-                }
-            }
-        } catch (jakarta.persistence.EntityNotFoundException e) {
-            throw e;
-        } catch (Exception ignored) {
-        }
-        return issue;
+        return getById(id);
     }
 
     @Transactional(readOnly = true)

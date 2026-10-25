@@ -346,10 +346,12 @@ function SpacesView({
   orgs,
   onEnter,
   onJoin,
+  userRole,
 }: {
   orgs: Organization[];
   onEnter: (o: Organization) => void;
   onJoin: () => void;
+  userRole?: string;
 }) {
   return (
     <div
@@ -457,7 +459,7 @@ function SpacesView({
                     background: `${org.accentColor}0C`,
                   }}
                 >
-                  {org.role}
+                  {userRole === "SUPER_ADMIN" ? "PLATFORM ADMIN" : (userRole ?? org.role)}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-3 mb-4">
@@ -1060,7 +1062,7 @@ function OrgSidebar({
 }) {
   const [orgOpen, setOrgOpen] = useState(false);
   const isSuperAdminRole = userRole === "SUPER_ADMIN" || isSuperAdmin;
-  const isOrgAdminRole = userRole === "ADMIN" || org.role === "ADMIN" || org.role === "OWNER";
+  const isOrgAdminRole = userRole === "ADMIN";
   const isInvestigatorRole = userRole === "INVESTIGATOR";
   const isStudentRole = userRole === "STUDENT" || (!isSuperAdminRole && !isOrgAdminRole && !isInvestigatorRole);
 
@@ -1170,7 +1172,7 @@ function OrgSidebar({
               className="font-mono text-[10px] uppercase tracking-widest"
               style={{ color: C.cyan }}
             >
-              {userRole ?? org.role}
+              {userRole === "SUPER_ADMIN" ? "PLATFORM ADMIN" : (userRole ?? "MEMBER")}
             </div>
           </div>
           <ChevronDown
@@ -5300,10 +5302,7 @@ export default function App() {
 
   // Authoritative role evaluation
   const isSuperAdmin = userProfile?.role === "SUPER_ADMIN";
-  const isAdmin =
-    isSuperAdmin ||
-    userProfile?.role === "ADMIN" ||
-    (currentOrg ? currentOrg.role === "ADMIN" || currentOrg.role === "OWNER" : false);
+  const isAdmin = isSuperAdmin || userProfile?.role === "ADMIN";
 
   const selectedReport = useMemo(
     () => reports.find((r) => r.id === selectedReportId) ?? null,
@@ -5331,11 +5330,13 @@ export default function App() {
         } else if (userProfile?.role === "INVESTIGATOR") {
           page = await getAssignedComplaints({ size: 100 });
         } else {
-          page = await getAdminFeed({ size: 100, sort: "createdAt,desc" });
+          const orgIdParam = isSuperAdmin && currentOrg ? Number(currentOrg.id) : undefined;
+          page = await getAdminFeed({ size: 100, sort: "createdAt,desc", organizationId: orgIdParam });
         }
       } catch (err) {
         if (err instanceof ApiError && err.status === 403) {
-          page = await getPublicFeed({ size: 100, sort: "createdAt,desc" });
+          const orgIdParam = currentOrg ? Number(currentOrg.id) : undefined;
+          page = await getPublicFeed({ size: 100, sort: "createdAt,desc", organizationId: orgIdParam });
         } else {
           throw err;
         }
@@ -5363,7 +5364,7 @@ export default function App() {
     if (appState === "ORG") {
       loadReports();
     }
-  }, [appState, userProfile?.role]);
+  }, [appState, userProfile?.role, currentOrg?.id]);
 
   // ── Auth handlers ─────────────────────────────────────────────────────────────
   const handleLoginSuccess = async () => {
@@ -5603,6 +5604,8 @@ export default function App() {
         <PublicForum
           onBack={() => navigateTo(isAuthenticated() ? "/" : "/login", isAuthenticated() ? "SPACES" : "LOGIN")}
           isAdmin={isAdmin || isSuperAdmin}
+          isSuperAdmin={isSuperAdmin}
+          userRole={userProfile?.role}
         />
       )}
 
@@ -5645,6 +5648,7 @@ export default function App() {
             orgs={_orgs}
             onEnter={handleEnterOrg}
             onJoin={() => setShowJoin(true)}
+            userRole={userProfile?.role}
           />
           <AnimatePresence>
             {showJoin && (
@@ -5682,8 +5686,10 @@ export default function App() {
                 (o) => o.id !== currentOrg.id,
               );
               if (next) {
+                setReports([]);
+                setSelectedReportId(null);
                 setCurrentOrg(next);
-                setOrgView("OVERVIEW");
+                setOrgView(userProfile?.role === "STUDENT" || userProfile?.role === "INVESTIGATOR" ? "REPORTS" : "OVERVIEW");
               }
             }}
             onLeave={() => {
@@ -5794,6 +5800,8 @@ export default function App() {
               <PublicForum
                 onBack={() => setOrgView("OVERVIEW")}
                 isAdmin={isAdmin || isSuperAdmin}
+                isSuperAdmin={isSuperAdmin}
+                userRole={userProfile?.role}
               />
             )}
             {orgView === "FORUM_MODERATION" && (

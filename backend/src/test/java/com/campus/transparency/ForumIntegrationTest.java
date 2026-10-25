@@ -136,15 +136,16 @@ public class ForumIntegrationTest {
 
     @Test
     @Order(1)
-    void studentCanCreateForumPostAndDerivesOrganizationServerSide() throws Exception {
+    void superAdminCanCreateForumPostForOrganization() throws Exception {
         CreateForumPostRequest req = new CreateForumPostRequest(
                 "Improve library weekend hours",
                 "Could the library stay open until 10 PM on Sundays?",
-                "SUGGESTION"
+                "SUGGESTION",
+                orgA.getId()
         );
 
         MvcResult result = mockMvc.perform(post("/api/forum/posts")
-                        .with(user(studentA.getUsername()).roles("STUDENT"))
+                        .with(user(superAdmin.getUsername()).roles("SUPER_ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isCreated())
@@ -163,27 +164,33 @@ public class ForumIntegrationTest {
 
     @Test
     @Order(2)
-    void clientCannotOverrideOrganizationDuringPostCreation() throws Exception {
-        // Pass spoofed JSON with foreign organizationId
-        String spoofedPayload = """
-            {
-                "title": "Malicious Spoofed Post",
-                "content": "Trying to post to another org",
-                "category": "GENERAL",
-                "organizationId": %d
-            }
-        """.formatted(orgB.getId());
+    void nonSuperAdminRolesAreForbiddenFromCreatingForumPosts() throws Exception {
+        CreateForumPostRequest req = new CreateForumPostRequest(
+                "Non-super user trying to post",
+                "This should be 403 Forbidden",
+                "GENERAL"
+        );
 
-        MvcResult result = mockMvc.perform(post("/api/forum/posts")
+        // STUDENT -> 403
+        mockMvc.perform(post("/api/forum/posts")
                         .with(user(studentA.getUsername()).roles("STUDENT"))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(spoofedPayload))
-                .andExpect(status().isCreated())
-                .andReturn();
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden());
 
-        JsonNode root = objectMapper.readTree(result.getResponse().getContentAsString());
-        // Must derive strictly to studentA's organization (orgA), ignoring spoofed orgB
-        assertThat(root.get("organizationId").asLong()).isEqualTo(orgA.getId());
+        // ADMIN -> 403
+        mockMvc.perform(post("/api/forum/posts")
+                        .with(user(adminA.getUsername()).roles("ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden());
+
+        // INVESTIGATOR -> 403
+        mockMvc.perform(post("/api/forum/posts")
+                        .with(user("test_inv").roles("INVESTIGATOR"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -193,12 +200,13 @@ public class ForumIntegrationTest {
             {
                 "title": "Invalid Category Test",
                 "content": "Some valid content",
-                "category": "TOTALLY_INVALID_CATEGORY_NAME"
+                "category": "TOTALLY_INVALID_CATEGORY_NAME",
+                "organizationId": %d
             }
-        """;
+        """.formatted(orgA.getId());
 
         mockMvc.perform(post("/api/forum/posts")
-                        .with(user(studentA.getUsername()).roles("STUDENT"))
+                        .with(user(superAdmin.getUsername()).roles("SUPER_ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalidPayload))
                 .andExpect(status().isBadRequest());
@@ -207,10 +215,10 @@ public class ForumIntegrationTest {
     @Test
     @Order(4)
     void blankTitleIsRejectedWithBadRequest() throws Exception {
-        CreateForumPostRequest req = new CreateForumPostRequest("   ", "Valid content", "GENERAL");
+        CreateForumPostRequest req = new CreateForumPostRequest("   ", "Valid content", "GENERAL", orgA.getId());
 
         mockMvc.perform(post("/api/forum/posts")
-                        .with(user(studentA.getUsername()).roles("STUDENT"))
+                        .with(user(superAdmin.getUsername()).roles("SUPER_ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest());
@@ -219,10 +227,10 @@ public class ForumIntegrationTest {
     @Test
     @Order(5)
     void blankContentIsRejectedWithBadRequest() throws Exception {
-        CreateForumPostRequest req = new CreateForumPostRequest("Valid Title", "   ", "GENERAL");
+        CreateForumPostRequest req = new CreateForumPostRequest("Valid Title", "   ", "GENERAL", orgA.getId());
 
         mockMvc.perform(post("/api/forum/posts")
-                        .with(user(studentA.getUsername()).roles("STUDENT"))
+                        .with(user(superAdmin.getUsername()).roles("SUPER_ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest());
@@ -491,23 +499,23 @@ public class ForumIntegrationTest {
     @Test
     @Order(18)
     void excessivePostCreationIsBlockedWithTooManyRequests() throws Exception {
-        String rateLimitUser = "stu_rate_" + System.currentTimeMillis();
-        User rateUser = userRepository.save(new User(rateLimitUser, passwordEncoder.encode("Pass123!"), Role.STUDENT, orgA));
+        String rateLimitUser = "super_rate_" + System.currentTimeMillis();
+        User rateUser = userRepository.save(new User(rateLimitUser, passwordEncoder.encode("Pass123!"), Role.SUPER_ADMIN, null));
 
         // Capacity is 5 posts per hour
         for (int i = 1; i <= 5; i++) {
-            CreateForumPostRequest req = new CreateForumPostRequest("Post " + i, "Content " + i, "GENERAL");
+            CreateForumPostRequest req = new CreateForumPostRequest("Post " + i, "Content " + i, "GENERAL", orgA.getId());
             mockMvc.perform(post("/api/forum/posts")
-                            .with(user(rateUser.getUsername()).roles("STUDENT"))
+                            .with(user(rateUser.getUsername()).roles("SUPER_ADMIN"))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req)))
                     .andExpect(status().isCreated());
         }
 
         // 6th post must fail with 429
-        CreateForumPostRequest excessReq = new CreateForumPostRequest("Excess Post 6", "Excess content", "GENERAL");
+        CreateForumPostRequest excessReq = new CreateForumPostRequest("Excess Post 6", "Excess content", "GENERAL", orgA.getId());
         mockMvc.perform(post("/api/forum/posts")
-                        .with(user(rateUser.getUsername()).roles("STUDENT"))
+                        .with(user(rateUser.getUsername()).roles("SUPER_ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(excessReq)))
                 .andExpect(status().isTooManyRequests());
@@ -559,11 +567,12 @@ public class ForumIntegrationTest {
         CreateForumPostRequest req = new CreateForumPostRequest(
                 "Hostel Serious Water Problem",
                 "Community discussion on water leakage",
-                "DISCUSSION"
+                "DISCUSSION",
+                orgA.getId()
         );
 
         mockMvc.perform(post("/api/forum/posts")
-                        .with(user(studentA.getUsername()).roles("STUDENT"))
+                        .with(user(superAdmin.getUsername()).roles("SUPER_ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isCreated());

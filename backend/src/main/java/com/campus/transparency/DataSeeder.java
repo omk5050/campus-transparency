@@ -93,6 +93,21 @@ public class DataSeeder implements CommandLineRunner {
             System.out.println("Seeded platform SUPER_ADMIN: " + superAdminUsername);
         }
 
+        Organization meridianOrg = organizationRepository.findByName("Meridian Corporation")
+                .orElseGet(() -> organizationRepository.save(new Organization(
+                        "Meridian Corporation",
+                        OrganizationType.CORPORATE,
+                        OrganizationStatus.ACTIVE,
+                        "admin@meridian.com"
+                )));
+
+        if (userRepository.findByUsername("meridian_admin").isEmpty()) {
+            String meridianAdminPassword = passwordEncoder.encode("meridian123");
+            User mAdmin = new User("meridian_admin", meridianAdminPassword, Role.ADMIN, meridianOrg);
+            userRepository.save(mAdmin);
+            System.out.println("Seeded meridian user: meridian_admin/meridian123");
+        }
+
         userRepository.findAll().forEach(u -> {
             if (u.getRole() != Role.SUPER_ADMIN && u.getOrganization() == null) {
                 u.setOrganization(defaultOrg);

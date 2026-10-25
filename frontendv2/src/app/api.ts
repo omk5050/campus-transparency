@@ -233,6 +233,7 @@ export interface FeedParams {
   department?: string;
   assignedTo?: number;
   unassigned?: boolean;
+  organizationId?: number;
   startDate?: string;   // ISO-8601
   endDate?: string;     // ISO-8601
   page?: number;
@@ -256,8 +257,8 @@ function buildQuery(params: Record<string, string | number | boolean | undefined
 export async function getPublicFeed(
   params: FeedParams = {},
 ): Promise<SpringPage<BackendIssueResponse>> {
-  const { status, department, startDate, endDate, page = 0, size = 50, sort = 'createdAt,desc' } = params;
-  const query = buildQuery({ status, department, startDate, endDate, page, size, sort });
+  const { status, department, organizationId, startDate, endDate, page = 0, size = 50, sort = 'createdAt,desc' } = params;
+  const query = buildQuery({ status, department, organizationId, startDate, endDate, page, size, sort });
   return request<SpringPage<BackendIssueResponse>>(`/issues${query}`);
 }
 
@@ -269,8 +270,8 @@ export async function getPublicFeed(
 export async function getAdminFeed(
   params: FeedParams = {},
 ): Promise<SpringPage<BackendIssueResponse>> {
-  const { status, department, assignedTo, unassigned, startDate, endDate, page = 0, size = 100, sort = 'createdAt,desc' } = params;
-  const query = buildQuery({ status, department, assignedTo, unassigned, startDate, endDate, page, size, sort });
+  const { status, department, assignedTo, unassigned, organizationId, startDate, endDate, page = 0, size = 100, sort = 'createdAt,desc' } = params;
+  const query = buildQuery({ status, department, assignedTo, unassigned, organizationId, startDate, endDate, page, size, sort });
   return request<SpringPage<BackendIssueResponse>>(`/issues/admin${query}`);
 }
 
@@ -1137,6 +1138,7 @@ export async function createForumPost(data: {
   title: string;
   content: string;
   category: string;
+  organizationId?: number;
 }): Promise<ForumPostDetail> {
   return request<ForumPostDetail>('/forum/posts', {
     method: 'POST',

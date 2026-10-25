@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -543,6 +544,71 @@ public class TenantIsolationIntegrationTest {
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
         mockMvc.perform(post("/api/issues/" + issueOrgB.getId() + "/vote").param("delta", "5"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    }
+
+    // --------------------------------------------------------------------------
+    // Test 21 & 22: Tenant Isolation & Role Verification
+    // --------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("21. Verify role mapping on /api/auth/me for ADMIN, INVESTIGATOR, STUDENT, SUPER_ADMIN")
+    void roleMappingVerificationOnAuthMe() throws Exception {
+        User invUser = userRepository.findByUsername("test_investigator_role")
+                .orElseGet(() -> userRepository.save(new User("test_investigator_role", "hash", Role.INVESTIGATOR, defaultOrgA)));
+
+        User superUser = userRepository.findByUsername("test_superadmin_role")
+                .orElseGet(() -> userRepository.save(new User("test_superadmin_role", "hash", Role.SUPER_ADMIN, null)));
+
+        // ADMIN -> role: ADMIN
+        mockMvc.perform(get("/api/auth/me")
+                        .with(user(adminA.getUsername()).roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("ADMIN"));
+
+        // INVESTIGATOR -> role: INVESTIGATOR
+        mockMvc.perform(get("/api/auth/me")
+                        .with(user(invUser.getUsername()).roles("INVESTIGATOR")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("INVESTIGATOR"));
+
+        // STUDENT -> role: STUDENT
+        mockMvc.perform(get("/api/auth/me")
+                        .with(user(studentA.getUsername()).roles("STUDENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("STUDENT"));
+
+        // SUPER_ADMIN -> role: SUPER_ADMIN
+        mockMvc.perform(get("/api/auth/me")
+                        .with(user(superUser.getUsername()).roles("SUPER_ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("SUPER_ADMIN"));
+    }
+
+    @Test
+    @DisplayName("22. SuperAdmin can access any tenant and cross-tenant direct get returns 404")
+    void superAdminPlatformAccessAndCrossTenantDirectGet() throws Exception {
+        User superUser = userRepository.findByUsername("test_superadmin_role")
+                .orElseGet(() -> userRepository.save(new User("test_superadmin_role", "hash", Role.SUPER_ADMIN, null)));
+
+        // SuperAdmin gets issues with organizationId
+        mockMvc.perform(get("/api/issues/admin")
+                        .with(user(superUser.getUsername()).roles("SUPER_ADMIN"))
+                        .param("organizationId", String.valueOf(defaultOrgA.getId()))
+                        .param("size", "2000"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.[?(@.id == " + issueOrgA.getId() + ")]").exists());
+
+        // Admin A directly calling GET /api/issues/{issueOrgB} returns 404
+        mockMvc.perform(get("/api/issues/" + issueOrgB.getId())
+                        .with(user(adminA.getUsername()).roles("ADMIN")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        // Admin B directly calling GET /api/issues/{issueOrgA} returns 404
+        mockMvc.perform(get("/api/issues/" + issueOrgA.getId())
+                        .with(user(adminB.getUsername()).roles("ADMIN")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
