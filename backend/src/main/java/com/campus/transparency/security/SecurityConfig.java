@@ -53,6 +53,9 @@ public class SecurityConfig {
                         // Allow public access to your frontend static files
                         .requestMatchers("/", "/index.html", "/assets/**", "/vite.svg", "/*.ico", "/*.png").permitAll()
 
+                        // Allow public unauthenticated health check endpoint
+                        .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
+
                         // Allow public access to authentication endpoints
                         .requestMatchers("/api/auth/**").permitAll()
 

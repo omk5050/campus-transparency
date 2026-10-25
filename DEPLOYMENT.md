@@ -43,7 +43,7 @@ This runbook details the production deployment architecture, environment variabl
 - **Docker Context**: `./backend`
 - **DockerfilePath**: `./backend/Dockerfile`
 - **Port**: Dynamically bound via `${PORT:8080}`
-- **Health Check Path**: `/api/public/transparency`
+- **Health Check Path**: `/api/health`
 
 #### Required Environment Variables (Render Dashboard → ethos-backend → Environment):
 | Variable Name | Description | Example / Format |
